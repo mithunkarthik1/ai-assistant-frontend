@@ -51,7 +51,7 @@ export default function ChatMessages({ messages, isSending, error, onPromptClick
                 <span className="text-base">👋</span>
               </p>
               <p className="text-slate-600">
-                I provide instant, grounded answers based exclusively on our official <strong>Company Policy & Employee Handbook</strong>.
+                I can answer questions from the official <strong>Company Policy & Employee Handbook</strong>, retrieve project information, and help with general requests.
               </p>
               <div className="mt-3.5 pt-3 border-t border-slate-100">
                 <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">

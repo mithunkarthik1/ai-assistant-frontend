@@ -59,7 +59,7 @@ export default function ChatInput({ onSendMessage, isSending, isMaximized }) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about company policies, leaves, benefits, equipment, expenses..."
+            placeholder="Ask about policies, projects, or any general question..."
             rows={1}
             className="flex-1 max-h-36 resize-none bg-transparent py-2 px-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none leading-relaxed select-text"
           />
@@ -80,7 +80,7 @@ export default function ChatInput({ onSendMessage, isSending, isMaximized }) {
           </button>
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-1.5">
-          Grounded strictly in WorkPilot Employee Handbook. Responses are informative guidance.
+          Policy answers are grounded in the handbook; project answers use the Project API.
         </p>
       </div>
     </div>

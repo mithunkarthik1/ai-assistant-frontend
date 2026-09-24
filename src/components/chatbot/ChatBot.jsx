@@ -19,6 +19,12 @@ export default function ChatBot() {
   const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState(null);
+  const [sessionId] = useState(() => {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  });
 
   const handleOpenHandbook = (page = 1, highlight = "") => {
     setHandbookPage(page || 1);
@@ -85,7 +91,7 @@ export default function ChatBot() {
 
     setIsSending(true);
     try {
-      const response = await sendMessage(text, historyPayload);
+      const response = await sendMessage(text, historyPayload, sessionId);
       setMessages((prev) => [
         ...prev,
         {
@@ -99,7 +105,7 @@ export default function ChatBot() {
       const detail =
         err.response?.data?.error?.message ||
         err.response?.data?.detail ||
-        "Failed to connect to the Company Policy backend server.";
+        "Failed to connect to the WorkPilot assistant backend server.";
       setMessages((prev) => [
         ...prev,
         {

@@ -1,11 +1,11 @@
 import api from "./api";
 
-export async function sendMessage(message, history = []) {
+export async function sendMessage(message, history = [], sessionId = null) {
   const payload = { message };
-  if (history && history.length > 0) {
-    payload.history = history;
+  if (sessionId) {
+    payload.session_id = sessionId;
   }
-  const response = await api.post("/chat", payload);
+  const response = await api.post("/assistant/chat", payload);
   return response.data;
 }
 

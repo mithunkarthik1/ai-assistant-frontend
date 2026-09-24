@@ -36,7 +36,7 @@ export default function ChatHeader({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold tracking-wide text-white truncate">
-              Company Policy Assistant
+              WorkPilot Assistant
             </h2>
             {isMinimized && messageCount > 0 && (
               <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-900/80 text-indigo-300 border border-indigo-700/50">
@@ -48,7 +48,7 @@ export default function ChatHeader({
           <div className="flex items-center gap-1.5 text-xs text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-slate-300 text-[11px] font-medium truncate">
-              {isMinimized ? "Click anywhere to restore" : "WorkPilot Knowledge Base"}
+              {isMinimized ? "Click anywhere to restore" : "Policy + Project Assistant"}
             </span>
           </div>
         </div>
