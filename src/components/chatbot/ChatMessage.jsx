@@ -148,6 +148,7 @@ export default function ChatMessage({ message, onOpenHandbook }) {
           )}
         </div>
 
+
         {/* PDF action buttons: shown when info is NOT found in handbook, or if explicitly requested */}
         {shouldShowPdf && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">

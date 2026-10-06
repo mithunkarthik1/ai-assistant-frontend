@@ -4,6 +4,7 @@ import ChatHeader from "./ChatHeader";
 import ChatMessages from "./ChatMessages";
 import ChatInput from "./ChatInput";
 import PolicyHandbookModal from "./PolicyHandbookModal";
+import DocumentUploadModal from "./DocumentUploadModal";
 import { sendMessage } from "../../services/chatService";
 
 export default function ChatBot() {
@@ -15,6 +16,9 @@ export default function ChatBot() {
   const [isHandbookOpen, setIsHandbookOpen] = useState(false);
   const [handbookPage, setHandbookPage] = useState(1);
   const [handbookHighlight, setHandbookHighlight] = useState("");
+
+  // Document Upload Modal State
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   const [messages, setMessages] = useState([]);
   const [isSending, setIsSending] = useState(false);
@@ -32,7 +36,27 @@ export default function ChatBot() {
     setIsHandbookOpen(true);
   };
 
-  // Listen for global custom events to open handbook or chat from anywhere
+  const handleOpenUploadModal = () => {
+    setIsOpen(true);
+    setIsMinimized(false);
+    setIsUploadModalOpen(true);
+  };
+
+  const handleUploadSuccess = (result) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "assistant",
+        content: `📄 **${result.file_name}** indexed successfully into knowledge base!\n\n` +
+          `* **Status:** \`${result.status}\`\n` +
+          `* **Total Chunks:** ${result.total_chunks}\n` +
+          `* **Added:** ${result.chunks_added} | **Re-embedded:** ${result.chunks_updated} | **Skipped (0 cost):** ${result.chunks_skipped} | **Deleted:** ${result.chunks_deleted}\n\n` +
+          `You can now ask questions about the contents of **${result.file_name}**!`,
+      },
+    ]);
+  };
+
+  // Listen for global custom events to open handbook, chat, or upload from anywhere
   useEffect(() => {
     const handleOpenHandbookEvent = (e) => {
       const page = e.detail?.page || 1;
@@ -43,13 +67,19 @@ export default function ChatBot() {
       setIsOpen(true);
       setIsMinimized(false);
     };
+    const handleOpenUploadEvent = () => {
+      handleOpenUploadModal();
+    };
     window.addEventListener("open-policy-handbook", handleOpenHandbookEvent);
     window.addEventListener("open-policy-chat", handleOpenChatEvent);
+    window.addEventListener("open-document-upload", handleOpenUploadEvent);
     return () => {
       window.removeEventListener("open-policy-handbook", handleOpenHandbookEvent);
       window.removeEventListener("open-policy-chat", handleOpenChatEvent);
+      window.removeEventListener("open-document-upload", handleOpenUploadEvent);
     };
   }, []);
+
 
   // Keyboard shortcut: Escape to restore or exit maximize
   useEffect(() => {
@@ -171,6 +201,7 @@ export default function ChatBot() {
               {/* Input Footer */}
               <ChatInput
                 onSendMessage={handleSendMessage}
+                onOpenUploadModal={handleOpenUploadModal}
                 isSending={isSending}
                 isMaximized={isMaximized}
               />
@@ -185,6 +216,13 @@ export default function ChatBot() {
         onClose={() => setIsHandbookOpen(false)}
         initialPage={handbookPage}
         highlightText={handbookHighlight}
+      />
+
+      {/* Incremental Document Upload & Knowledge Base Modal */}
+      <DocumentUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUploadSuccess={handleUploadSuccess}
       />
     </>
   );

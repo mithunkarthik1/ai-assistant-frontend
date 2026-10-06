@@ -48,7 +48,7 @@ export default function ChatHeader({
           <div className="flex items-center gap-1.5 text-xs text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-slate-300 text-[11px] font-medium truncate">
-              {isMinimized ? "Click anywhere to restore" : "Policy + Project Assistant"}
+              {isMinimized ? "Click anywhere to restore" : "Policy + Document Assistant"}
             </span>
           </div>
         </div>

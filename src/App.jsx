@@ -42,10 +42,10 @@ export default function App() {
           <button
             type="button"
             onClick={handleOpenHandbook}
-            className="px-5 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 font-semibold text-sm shadow-xs transition cursor-pointer flex items-center gap-2 hover:scale-[1.02]"
+            className="px-4 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 font-semibold text-sm shadow-xs transition cursor-pointer flex items-center gap-2 hover:scale-[1.02]"
           >
             <FileText className="w-4 h-4 text-indigo-600" />
-            <span>View Policy Handbook (PDF)</span>
+            <span>View Handbook (PDF)</span>
           </button>
           <a
             href={pdfUrl}
