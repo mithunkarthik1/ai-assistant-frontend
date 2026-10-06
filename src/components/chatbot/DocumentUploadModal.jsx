@@ -6,6 +6,7 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
+  Lock,
   X,
   RefreshCw,
   Layers,
@@ -19,6 +20,7 @@ import { uploadDocument, getDocuments, deleteDocument } from "../../services/cha
 export default function DocumentUploadModal({ isOpen, onClose, onUploadSuccess }) {
   const [documents, setDocuments] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadResult, setUploadResult] = useState(null);
@@ -35,6 +37,20 @@ export default function DocumentUploadModal({ isOpen, onClose, onUploadSuccess }
       console.error("Failed to load documents:", err);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    const start = Date.now();
+    try {
+      await fetchDocs();
+    } finally {
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, 700 - elapsed);
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, remaining);
     }
   };
 
@@ -102,6 +118,10 @@ export default function DocumentUploadModal({ isOpen, onClose, onUploadSuccess }
   };
 
   const handleDelete = async (docId, fileName) => {
+    if (docId === "00000000-0000-0000-0000-000000000002") {
+      alert("The default company policy document is protected and cannot be deleted.");
+      return;
+    }
     if (!window.confirm(`Delete document "${fileName}" and purge its vectors?`)) return;
     try {
       await deleteDocument(docId);
@@ -261,11 +281,12 @@ export default function DocumentUploadModal({ isOpen, onClose, onUploadSuccess }
                 <span>Indexed Document Registry ({documents.length})</span>
               </h3>
               <button
-                onClick={fetchDocs}
-                disabled={isLoading}
-                className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1 font-medium transition cursor-pointer"
+                onClick={handleRefresh}
+                disabled={isLoading || isRefreshing}
+                className="text-xs text-slate-500 hover:text-slate-800 flex items-center gap-1.5 font-medium transition cursor-pointer"
+                title="Refresh document registry"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                <RefreshCw className={`w-3.5 h-3.5 transition-transform ${isRefreshing || isLoading ? "animate-spin text-indigo-600" : ""}`} />
                 <span>Refresh</span>
               </button>
             </div>
@@ -276,53 +297,68 @@ export default function DocumentUploadModal({ isOpen, onClose, onUploadSuccess }
               </div>
             ) : (
               <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-xs">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.document_id}
-                    className="p-3 sm:p-4 flex items-center justify-between gap-3 hover:bg-slate-50/80 transition"
-                  >
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
-                        <FileText className="w-4 h-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                            {doc.file_name}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${getStatusBadge(
-                              doc.status
-                            )}`}
-                          >
-                            {doc.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 flex-wrap">
-                          <span className="inline-flex items-center gap-1">
-                            <Layers className="w-3 h-3 text-slate-400" />
-                            <span>{doc.chunk_count} chunks</span>
-                          </span>
-                          <span className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-400">
-                            <Hash className="w-3 h-3 text-slate-400" />
-                            <span>{doc.file_hash.slice(0, 10)}...</span>
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {new Date(doc.updated_at || doc.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleDelete(doc.document_id, doc.file_name)}
-                      className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
-                      title="Delete document and purge vectors"
+                {documents.map((doc) => {
+                  const isDefaultDoc =
+                    Boolean(doc.is_default) ||
+                    doc.document_id === "00000000-0000-0000-0000-000000000002";
+                  return (
+                    <div
+                      key={doc.document_id}
+                      className="p-3 sm:p-4 flex items-center justify-between gap-3 hover:bg-slate-50/80 transition"
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                          <FileText className="w-4 h-4" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                              {doc.file_name}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${getStatusBadge(
+                                doc.status
+                              )}`}
+                            >
+                              {doc.status}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-500 flex-wrap">
+                            <span className="inline-flex items-center gap-1">
+                              <Layers className="w-3 h-3 text-slate-400" />
+                              <span>{doc.chunk_count} chunks</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1 font-mono text-[10px] text-slate-400">
+                              <Hash className="w-3 h-3 text-slate-400" />
+                              <span>{doc.file_hash.slice(0, 10)}...</span>
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(doc.updated_at || doc.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isDefaultDoc ? (
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200 select-none shrink-0"
+                          title="The default system policy document is protected and cannot be deleted."
+                        >
+                          <Lock className="w-3 h-3 text-slate-400" />
+                          <span>Protected</span>
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleDelete(doc.document_id, doc.file_name)}
+                          className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer shrink-0"
+                          title="Delete document and purge vectors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
