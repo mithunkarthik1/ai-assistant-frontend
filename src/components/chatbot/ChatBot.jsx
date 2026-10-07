@@ -163,7 +163,7 @@ export default function ChatBot() {
       const detail =
         err.response?.data?.error?.message ||
         err.response?.data?.detail ||
-        "Failed to connect to the WorkPilot assistant backend server.";
+        "Failed to connect to the AI assistant backend server.";
       setMessages((prev) => [
         ...prev,
         {
