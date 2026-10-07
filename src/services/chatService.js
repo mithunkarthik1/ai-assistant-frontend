@@ -19,6 +19,14 @@ export async function getPolicyPages() {
   return response.data;
 }
 
+export async function getDocumentPages(documentId = null) {
+  if (!documentId || documentId === "00000000-0000-0000-0000-000000000002") {
+    return await getPolicyPages();
+  }
+  const response = await api.get(`/documents/${documentId}/pages`);
+  return response.data;
+}
+
 export function getPolicyPdfUrl() {
   const baseURL = api.defaults.baseURL || "http://localhost:8001/api/v1";
   return `${baseURL}/chat/pdf`;

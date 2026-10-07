@@ -16,6 +16,13 @@ export default function ChatBot() {
   const [isHandbookOpen, setIsHandbookOpen] = useState(false);
   const [handbookPage, setHandbookPage] = useState(1);
   const [handbookHighlight, setHandbookHighlight] = useState("");
+  const [handbookDocInfo, setHandbookDocInfo] = useState({
+    documentId: "00000000-0000-0000-0000-000000000002",
+    documentName: "WorkPilot_Company_Policy.pdf",
+    isDefault: true,
+    targetSection: null,
+    targetTopic: null,
+  });
 
   // Document Upload Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -30,9 +37,29 @@ export default function ChatBot() {
     return `web-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   });
 
-  const handleOpenHandbook = (page = 1, highlight = "") => {
+  const handleOpenHandbook = (page = 1, docInfoOrHighlight = null) => {
     setHandbookPage(page || 1);
-    setHandbookHighlight(highlight || "");
+    if (docInfoOrHighlight && typeof docInfoOrHighlight === "object" && docInfoOrHighlight.documentId) {
+      setHandbookDocInfo({
+        documentId: docInfoOrHighlight.documentId,
+        documentName: docInfoOrHighlight.documentName || "Document",
+        isDefault: Boolean(docInfoOrHighlight.isDefault),
+        targetSection: docInfoOrHighlight.targetSection || null,
+        targetTopic: docInfoOrHighlight.targetTopic || null,
+      });
+      setHandbookHighlight(docInfoOrHighlight.highlightText || "");
+    } else if (typeof docInfoOrHighlight === "string") {
+      setHandbookHighlight(docInfoOrHighlight);
+    } else {
+      setHandbookDocInfo({
+        documentId: "00000000-0000-0000-0000-000000000002",
+        documentName: "WorkPilot_Company_Policy.pdf",
+        isDefault: true,
+        targetSection: null,
+        targetTopic: null,
+      });
+      setHandbookHighlight("");
+    }
     setIsHandbookOpen(true);
   };
 
@@ -61,7 +88,8 @@ export default function ChatBot() {
     const handleOpenHandbookEvent = (e) => {
       const page = e.detail?.page || 1;
       const highlight = e.detail?.highlight || "";
-      handleOpenHandbook(page, highlight);
+      const docInfo = e.detail?.docInfo || null;
+      handleOpenHandbook(page, docInfo || highlight);
     };
     const handleOpenChatEvent = () => {
       setIsOpen(true);
@@ -164,7 +192,7 @@ export default function ChatBot() {
             setIsOpen(true);
             setIsMinimized(false);
           }}
-          aria-label="Open Company Policy AI assistant"
+          aria-label="Open AI Assistant"
           className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-xl hover:bg-slate-800 hover:scale-105 transition duration-200 cursor-pointer z-50 focus:outline-none focus:ring-4 focus:ring-slate-900/20"
         >
           <MessageCircle className="w-7 h-7" />
@@ -210,12 +238,17 @@ export default function ChatBot() {
         </div>
       )}
 
-      {/* Policy Handbook & PDF Viewer Modal */}
+      {/* Policy Handbook & Document Viewer Modal */}
       <PolicyHandbookModal
         isOpen={isHandbookOpen}
         onClose={() => setIsHandbookOpen(false)}
         initialPage={handbookPage}
         highlightText={handbookHighlight}
+        targetSection={handbookDocInfo.targetSection}
+        targetTopic={handbookDocInfo.targetTopic}
+        documentId={handbookDocInfo.documentId}
+        documentName={handbookDocInfo.documentName}
+        isDefault={handbookDocInfo.isDefault}
       />
 
       {/* Incremental Document Upload & Knowledge Base Modal */}

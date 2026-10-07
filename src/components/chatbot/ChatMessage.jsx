@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Bot, User, Copy, Check, FileText, ExternalLink } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Bot, User, Copy, Check, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { getPolicyPdfUrl } from "../../services/chatService";
 
-export default function ChatMessage({ message, onOpenHandbook }) {
+export default function ChatMessage({ message, previousMessage, onOpenHandbook }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const pdfUrl = getPolicyPdfUrl();
@@ -30,23 +30,186 @@ export default function ChatMessage({ message, onOpenHandbook }) {
     }
   };
 
-  const firstSource = message.sources && message.sources.length > 0 ? message.sources[0] : null;
+  // Only show handbook chips when the answer is grounded in / answered from documents
+  const hasDocumentSources = !isUser && Boolean(message.sources && message.sources.length > 0);
 
-  // Show PDF buttons if information is NOT found in handbook, or if explicitly requested.
-  // When a valid grounded answer is found from policy, show_pdf is false ("or else no needed").
-  const shouldShowPdf =
-    !isUser &&
-    (message.show_pdf === true ||
-      (message.show_pdf !== false &&
-        (message.content?.includes("WorkPilot Company Policy Handbook (PDF)") ||
-          message.content?.includes("Policy Handbook (PDF) directly below") ||
-          message.content?.includes("couldn't find") ||
-          message.content?.includes("could not find") ||
-          message.content?.includes("wasn't able to find") ||
-          message.content?.includes("not documented in") ||
-          message.content?.includes("outside our documented") ||
-          message.content?.includes("consult Workplace Operations") ||
-          message.content?.includes("consult People Operations"))));
+  // Group unique cited documents and pick their most specific topic
+  const uniqueCitedDocs = useMemo(() => {
+    if (!message.sources || message.sources.length === 0) return [];
+
+    const map = new Map();
+    const isGeneric = (t) => {
+      if (!t) return true;
+      const s = String(t).toLowerCase().trim().replace(/[:.]/g, "");
+      const genericWords = [
+        "general", "details", "overview", "introduction", "section",
+        "handbook", "objective", "are", "is", "was", "were", "ex", "eg", "case",
+        "example", "note", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+        "30-day", "day", "days", "clause", "document", "part", "such as", "as follows"
+      ];
+      if (genericWords.includes(s)) return true;
+      if (/^\d+$/.test(s)) return true;
+      if (s.length < 3) return true;
+      return false;
+    };
+
+    for (const src of message.sources) {
+      const docKey = src.document_id || src.filename;
+      if (!docKey) continue;
+
+      const isDefault =
+        !src.document_id ||
+        src.document_id === "00000000-0000-0000-0000-000000000002" ||
+        src.filename === "WorkPilot_Company_Policy.pdf" ||
+        src.filename?.toLowerCase().includes("workpilot");
+
+      const rawTopic = (src.topic || "").trim();
+      const rawSection = (src.section || "").trim();
+      let bestTopic = "";
+      if (!isGeneric(rawTopic)) {
+        bestTopic = rawTopic;
+      } else if (!isGeneric(rawSection)) {
+        bestTopic = rawSection;
+      } else {
+        bestTopic = "";
+      }
+
+      const displayName = isDefault ? "Company Policy" : (src.filename || "Document");
+
+      if (!map.has(docKey)) {
+        map.set(docKey, {
+          documentId: isDefault ? "00000000-0000-0000-0000-000000000002" : src.document_id,
+          filename: displayName,
+          rawFilename: src.filename || (isDefault ? "WorkPilot_Company_Policy.pdf" : "Document.pdf"),
+          isDefault,
+          page: src.page || 1,
+          topic: bestTopic,
+          section: rawSection,
+        });
+      } else {
+        const existing = map.get(docKey);
+        if (isGeneric(existing.topic) && !isGeneric(bestTopic)) {
+          existing.topic = bestTopic;
+          existing.page = src.page || existing.page;
+        }
+      }
+    }
+
+    return Array.from(map.values());
+  }, [message.sources]);
+
+  // Determine if the user inquiry specifically targeted a particular PDF/document.
+  // When a user asks about one specific PDF ("in ms leave policy", "what bubble sort?"),
+  // show ONLY that handbook ("just show that handbook no two").
+  const displayDocs = useMemo(() => {
+    if (!uniqueCitedDocs || uniqueCitedDocs.length === 0) return [];
+
+    const userPrompt = (
+      previousMessage?.role === "user" ? previousMessage.content : ""
+    ).toLowerCase().trim();
+
+    const assistantText = (message.content || "").toLowerCase();
+    const isNegativeAnswer = [
+      "not specified in the retrieved knowledge base",
+      "not documented in the current knowledge base",
+      "not found in the available knowledge base",
+      "not mentioned in the retrieved context",
+      "couldn't find information regarding",
+      "not specified in the available documents",
+    ].some((phrase) => assistantText.includes(phrase));
+
+    const isDocTargeted = (doc) => {
+      if (!userPrompt) return false;
+
+      if (doc.isDefault) {
+        const defaultKeywords = [
+          "company policy",
+          "workpilot policy",
+          "workpilot",
+          "work pilot",
+          "company handbook",
+          "default policy",
+          "employee handbook",
+          "workpilot_company_policy",
+        ];
+        return defaultKeywords.some((kw) => userPrompt.includes(kw));
+      }
+
+      const raw = (doc.rawFilename || doc.filename || "").toLowerCase();
+      const baseName = raw.replace(/\.[^/.]+$/, "");
+      const cleanName = baseName.replace(/^[\d.\-_ ]+/, "").trim();
+      const spaceName = cleanName.replace(/[()[\]{}\-_.,:;]+/g, " ").trim();
+
+      if (
+        userPrompt.includes(raw) ||
+        userPrompt.includes(baseName) ||
+        (cleanName.length >= 3 && userPrompt.includes(cleanName)) ||
+        (spaceName.length >= 3 && userPrompt.includes(spaceName))
+      ) {
+        return true;
+      }
+
+      const words = spaceName.split(/\s+/).filter((w) => w.length > 1);
+      // Check bigrams (e.g. "bubble sort")
+      for (let i = 0; i < words.length - 1; i++) {
+        const bigram = `${words[i]} ${words[i + 1]}`;
+        if (bigram.length >= 4 && userPrompt.includes(bigram)) {
+          return true;
+        }
+      }
+
+      // Check first distinctive word combined with doc/pdf/file/policy/handbook
+      if (words.length > 0 && !["company", "policy", "the", "doc", "file"].includes(words[0])) {
+        const firstWord = words[0];
+        if (
+          userPrompt.includes(firstWord) &&
+          (userPrompt.includes("policy") ||
+            userPrompt.includes("leave") ||
+            userPrompt.includes("doc") ||
+            userPrompt.includes("pdf") ||
+            userPrompt.includes("file") ||
+            userPrompt.includes("handbook"))
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
+    const targetedDocs = uniqueCitedDocs.filter(isDocTargeted);
+
+    // If query specifically targeted document(s), show ONLY those targeted documents
+    if (targetedDocs.length > 0) {
+      return targetedDocs;
+    }
+
+    // Check if the assistant answer itself explicitly attributes a specific document
+    const docMentions = uniqueCitedDocs.filter((doc) => {
+      const raw = (doc.rawFilename || doc.filename || "").toLowerCase();
+      const base = raw.replace(/\.[^/.]+$/, "");
+      const clean = base.replace(/^[\d.\-_ ]+/, "").trim();
+      const space = clean.replace(/[()[\]{}\-_.,:;]+/g, " ").trim();
+      return (
+        assistantText.includes(raw) ||
+        assistantText.includes(base) ||
+        (clean.length >= 3 && assistantText.includes(clean)) ||
+        (space.length >= 3 && assistantText.includes(space))
+      );
+    });
+
+    if (docMentions.length === 1 && !docMentions[0].isDefault) {
+      return docMentions;
+    }
+
+    // If the answer is negative ("not specified", "not documented") and no document was targeted or mentioned,
+    // do NOT display spurious unrelated citations (e.g. ms-leave-policy when asking about bubble sort)
+    if (isNegativeAnswer) {
+      return [];
+    }
+
+    return uniqueCitedDocs;
+  }, [uniqueCitedDocs, previousMessage, message.content]);
 
   return (
     <div
@@ -149,28 +312,66 @@ export default function ChatMessage({ message, onOpenHandbook }) {
         </div>
 
 
-        {/* PDF action buttons: shown when info is NOT found in handbook, or if explicitly requested */}
-        {shouldShowPdf && (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => onOpenHandbook && onOpenHandbook(firstSource?.page || 1)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200/80 transition-all cursor-pointer shadow-2xs group/chip"
-              title="Open interactive Policy Handbook"
-            >
-              <FileText className="w-3 h-3 text-indigo-600 group-hover/chip:scale-110 transition-transform" />
-              <span>Open Policy Handbook (PDF)</span>
-            </button>
-            <a
-              href={`${pdfUrl}#page=${firstSource?.page || 1}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-slate-600 hover:text-indigo-600 hover:bg-slate-100 border border-slate-200 transition-all cursor-pointer"
-              title="Open official PDF in new browser tab"
-            >
-              <ExternalLink className="w-3 h-3 text-slate-400" />
-              <span>Open PDF</span>
-            </a>
+        {/* Document Handbook Action Chips: shows compact chips for cited PDF(s) */}
+        {hasDocumentSources && displayDocs.length > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 max-w-full">
+            {displayDocs.map((doc, idx) => {
+              const isViolet = !doc.isDefault;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() =>
+                    onOpenHandbook &&
+                    onOpenHandbook(doc.page, {
+                      documentId: doc.documentId,
+                      documentName: doc.rawFilename,
+                      isDefault: doc.isDefault,
+                      targetSection: doc.section,
+                      targetTopic: doc.topic,
+                      highlightText: doc.topic || doc.section || "",
+                    })
+                  }
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all cursor-pointer shadow-2xs hover:shadow-xs group/chip max-w-full ${
+                    isViolet
+                      ? "bg-violet-50/90 hover:bg-violet-100 text-violet-900 border-violet-200/90"
+                      : "bg-indigo-50/90 hover:bg-indigo-100 text-indigo-900 border-indigo-200/90"
+                  }`}
+                  title={`Open ${doc.filename} handbook at Page ${doc.page}${doc.topic ? ` (${doc.topic})` : ""}`}
+                >
+                  <FileText
+                    className={`w-3 h-3 shrink-0 group-hover/chip:scale-110 transition-transform ${
+                      isViolet ? "text-violet-600" : "text-indigo-600"
+                    }`}
+                  />
+                  <span className="font-semibold text-slate-800 shrink-0 truncate max-w-[120px] sm:max-w-[150px]">
+                    {doc.filename}
+                  </span>
+                  {doc.topic && (
+                    <>
+                      <span className="text-slate-300 select-none">•</span>
+                      <span
+                        className={`font-semibold px-1 py-0.5 rounded text-[10px] shrink-0 truncate max-w-[110px] sm:max-w-[140px] ${
+                          isViolet
+                            ? "bg-violet-100/90 text-violet-700"
+                            : "bg-indigo-100/90 text-indigo-700"
+                        }`}
+                      >
+                        {doc.topic}
+                      </span>
+                    </>
+                  )}
+                  <span className="text-slate-300 select-none">•</span>
+                  <span
+                    className={`text-[10px] font-bold shrink-0 ${
+                      isViolet ? "text-violet-600" : "text-indigo-600"
+                    }`}
+                  >
+                    Pg {doc.page}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 

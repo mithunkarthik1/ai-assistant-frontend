@@ -73,7 +73,7 @@ export default function ChatInput({ onSendMessage, onOpenUploadModal, isSending,
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about policies, documents, projects..."
+            placeholder="Ask a question about documents, projects..."
             rows={1}
             className="flex-1 max-h-36 resize-none bg-transparent py-2 px-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none leading-relaxed select-text"
           />
@@ -94,7 +94,7 @@ export default function ChatInput({ onSendMessage, onOpenUploadModal, isSending,
           </button>
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-1.5">
-          Policy answers are grounded in the handbook; project answers use the Project API.
+          AI Assistant • Answers are grounded in your knowledge base and uploaded documents.
         </p>
       </div>
     </div>
