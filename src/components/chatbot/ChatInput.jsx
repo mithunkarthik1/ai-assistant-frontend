@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2 } from "lucide-react";
+import { Send, Loader2, Paperclip } from "lucide-react";
 
-export default function ChatInput({ onSendMessage, isSending, isMaximized }) {
+export default function ChatInput({ onSendMessage, onOpenUploadModal, isSending, isMaximized }) {
   const [text, setText] = useState("");
   const textareaRef = useRef(null);
+
 
   // Auto-focus on initial mount
   useEffect(() => {
@@ -53,15 +54,28 @@ export default function ChatInput({ onSendMessage, isSending, isMaximized }) {
     <div className="p-3 sm:p-4 border-t border-slate-200 bg-white">
       <div className={`mx-auto w-full ${isMaximized ? "max-w-3xl" : "max-w-full"}`}>
         <div className="flex items-end gap-2 border border-slate-200 rounded-2xl p-1.5 focus-within:border-slate-400 focus-within:ring-2 focus-within:ring-slate-900/5 transition bg-slate-50/50 shadow-xs">
+          {/* Document Upload / Attach Button */}
+          {onOpenUploadModal && (
+            <button
+              type="button"
+              onClick={onOpenUploadModal}
+              title="Upload document to knowledge base (PDF, DOCX, TXT)"
+              aria-label="Upload document"
+              className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/80 transition cursor-pointer shrink-0 mb-0.5"
+            >
+              <Paperclip className="w-4 h-4" />
+            </button>
+          )}
+
           {/* Textarea Input - Always enabled to keep cursor in place */}
           <textarea
             ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask about company policies, leaves, benefits, equipment, expenses..."
+            placeholder="Ask a question about documents, projects..."
             rows={1}
-            className="flex-1 max-h-36 resize-none bg-transparent py-2 px-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none leading-relaxed select-text"
+            className="flex-1 max-h-36 resize-none bg-transparent py-2 px-1 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none leading-relaxed select-text"
           />
 
           {/* Send Button */}
@@ -80,7 +94,7 @@ export default function ChatInput({ onSendMessage, isSending, isMaximized }) {
           </button>
         </div>
         <p className="text-[10px] text-slate-400 text-center mt-1.5">
-          Grounded strictly in WorkPilot Employee Handbook. Responses are informative guidance.
+          AI Assistant • Answers are grounded in your knowledge base and uploaded documents.
         </p>
       </div>
     </div>

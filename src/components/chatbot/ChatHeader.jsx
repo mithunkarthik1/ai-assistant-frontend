@@ -1,4 +1,4 @@
-import { ShieldCheck, Minus, Maximize2, Minimize2, ChevronUp, X, MessageSquare, BookOpen } from "lucide-react";
+import { Bot, Minus, Maximize2, Minimize2, ChevronUp, X, MessageSquare, BookOpen } from "lucide-react";
 
 export default function ChatHeader({
   onClose,
@@ -31,12 +31,12 @@ export default function ChatHeader({
       {/* Bot Identity */}
       <div className="flex items-center gap-2.5 min-w-0">
         <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-200 border border-slate-700/60 shrink-0 shadow-xs">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          <Bot className="w-4 h-4 text-indigo-400" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-semibold tracking-wide text-white truncate">
-              Company Policy Assistant
+              AI Assistant
             </h2>
             {isMinimized && messageCount > 0 && (
               <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-indigo-900/80 text-indigo-300 border border-indigo-700/50">
@@ -48,7 +48,7 @@ export default function ChatHeader({
           <div className="flex items-center gap-1.5 text-xs text-emerald-400">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-slate-300 text-[11px] font-medium truncate">
-              {isMinimized ? "Click anywhere to restore" : "WorkPilot Knowledge Base"}
+              {isMinimized ? "Click anywhere to restore" : "Online • Knowledge & Document Assistant"}
             </span>
           </div>
         </div>
@@ -64,12 +64,12 @@ export default function ChatHeader({
           <button
             type="button"
             onClick={() => onOpenHandbook(1)}
-            aria-label="Open Policy Handbook PDF"
-            title="Open Official Policy Handbook (PDF)"
+            aria-label="Open Document Handbook PDF"
+            title="Open Document Handbook (PDF)"
             className="px-2.5 py-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-800 transition cursor-pointer text-xs font-semibold flex items-center gap-1.5 mr-1 border border-slate-700 hover:border-slate-500 bg-slate-800/80 shadow-xs"
           >
             <BookOpen className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Policy PDF</span>
+            <span>Handbook PDF</span>
           </button>
         )}
 

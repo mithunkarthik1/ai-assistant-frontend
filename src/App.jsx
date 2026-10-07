@@ -22,11 +22,11 @@ export default function App() {
         </div>
 
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900">
-          Company Policy AI Assistant
+          AI Assistant
         </h1>
 
         <p className="mt-4 text-base sm:text-lg text-slate-600 font-normal leading-relaxed">
-          Ask questions about working hours, remote work, PTO & leave policies, expense limits, insurance, and company guidelines.
+          Ask questions about your uploaded documents, company policies, projects, and guidelines.
         </p>
 
         {/* Prominent Quick Action CTAs */}
@@ -37,15 +37,15 @@ export default function App() {
             className="px-5 py-2.5 rounded-xl bg-slate-900 text-white font-semibold text-sm shadow-md hover:bg-slate-800 transition cursor-pointer flex items-center gap-2 hover:scale-[1.02]"
           >
             <MessageCircle className="w-4 h-4" />
-            <span>Open Policy Assistant</span>
+            <span>Open AI Assistant</span>
           </button>
           <button
             type="button"
             onClick={handleOpenHandbook}
-            className="px-5 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 font-semibold text-sm shadow-xs transition cursor-pointer flex items-center gap-2 hover:scale-[1.02]"
+            className="px-4 py-2.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200 font-semibold text-sm shadow-xs transition cursor-pointer flex items-center gap-2 hover:scale-[1.02]"
           >
             <FileText className="w-4 h-4 text-indigo-600" />
-            <span>View Policy Handbook (PDF)</span>
+            <span>View Handbook (PDF)</span>
           </button>
           <a
             href={pdfUrl}

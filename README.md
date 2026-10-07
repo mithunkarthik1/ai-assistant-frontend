@@ -1,3 +1,7 @@
+
+
+
+
 # ai-assistant-frontend
 
 A modern, responsive React + Vite chat interface for the WorkPilot AI Assistant Platform.
