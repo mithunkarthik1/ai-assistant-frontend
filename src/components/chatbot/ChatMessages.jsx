@@ -1,6 +1,59 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Sparkles, X } from "lucide-react";
+import { Bot, Sparkles, Search, Layers, CheckCircle2 } from "lucide-react";
 import ChatMessage from "./ChatMessage";
+
+function ThinkingIndicator() {
+  const [stageIndex, setStageIndex] = useState(0);
+
+  const stages = [
+    { text: "Thinking...", detail: "Analyzing your request", icon: Sparkles, color: "text-indigo-500" },
+    { text: "Searching knowledge base...", detail: "Checking documents", icon: Search, color: "text-blue-500" },
+    { text: "Consolidating...", detail: "Synthesizing answer", icon: Layers, color: "text-violet-500" },
+    { text: "Almost finished...", detail: "Finalizing response", icon: CheckCircle2, color: "text-emerald-500" },
+  ];
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStageIndex(1), 2200);
+    const t2 = setTimeout(() => setStageIndex(2), 5000);
+    const t3 = setTimeout(() => setStageIndex(3), 8500);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, []);
+
+  const currentStage = stages[stageIndex];
+  const IconComponent = currentStage.icon;
+
+  return (
+    <div className="flex items-start gap-2.5 text-slate-500 text-xs pl-1 animate-in fade-in duration-300">
+      <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0 mt-0.5">
+        <Bot className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+      </div>
+      <div className="flex flex-col gap-1 max-w-[320px]">
+        <div className="flex items-center gap-2.5 bg-white border border-slate-200/90 px-3.5 py-2.5 rounded-2xl rounded-tl-sm shadow-xs text-slate-700 transition-all duration-300">
+          <div className="w-5 h-5 rounded-md bg-slate-100 flex items-center justify-center shrink-0">
+            <IconComponent className={`w-3.5 h-3.5 ${currentStage.color} animate-spin`} style={{ animationDuration: '3s' }} />
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="font-semibold text-xs text-slate-800 transition-all duration-300 truncate">
+              {currentStage.text}
+            </span>
+            <span className="text-[10px] text-slate-400 font-normal truncate">
+              {currentStage.detail}
+            </span>
+          </div>
+          <div className="ml-auto pl-1 flex items-center gap-1 select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ChatMessages({ messages, isSending, error, onPromptClick, isMaximized, onOpenHandbook }) {
   const bottomRef = useRef(null);
@@ -85,19 +138,8 @@ export default function ChatMessages({ messages, isSending, error, onPromptClick
           />
         ))}
 
-
-        {/* Thinking / LLM Generating State */}
-        {isSending && (
-          <div className="flex items-center gap-2.5 text-slate-500 text-xs pl-1">
-            <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0">
-              <Bot className="w-3.5 h-3.5 text-indigo-600" />
-            </div>
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200/80 px-3 py-2 rounded-2xl rounded-tl-sm shadow-xs text-slate-600">
-              <Sparkles className="w-3 h-3 text-indigo-500 animate-spin" />
-              <span className="font-medium text-xs">Thinking...</span>
-            </div>
-          </div>
-        )}
+        {/* Dynamic Multi-Stage Thinking State */}
+        {isSending && <ThinkingIndicator />}
 
         {/* Error Notice */}
         {error && (

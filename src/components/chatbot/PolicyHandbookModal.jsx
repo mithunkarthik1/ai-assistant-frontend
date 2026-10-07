@@ -89,6 +89,7 @@ export default function PolicyHandbookModal({
   const [selectedPage, setSelectedPage] = useState(initialPage);
   const [focusedSectionId, setFocusedSectionId] = useState(null);
   const pageRefs = useRef({});
+  const scrollContainerRef = useRef(null);
   const loadedDocIdRef = useRef(null);
 
   const pdfUrl = getPolicyPdfUrl();
@@ -132,6 +133,27 @@ export default function PolicyHandbookModal({
             title: sec.title,
             id: `section-num-${sec.num}`,
             label: `§ ${sec.num}. ${sec.title}`,
+            isBullet: false,
+          });
+
+          // Also index every bullet subtopic so topics like "Paternity Leave", "Full and Final Settlement", etc. can be jumped to directly!
+          (sec.bullets || []).forEach((b, bIdx) => {
+            if (b.includes(":")) {
+              const [bLabel] = b.split(":", 1);
+              const cleanLabel = bLabel.trim();
+              if (cleanLabel.length >= 3) {
+                list.push({
+                  pageNum,
+                  num: sec.num,
+                  title: cleanLabel,
+                  parentTitle: sec.title,
+                  id: `section-${sec.num}-bullet-${bIdx}`,
+                  parentSectionId: `section-num-${sec.num}`,
+                  label: `${cleanLabel} (§ ${sec.num})`,
+                  isBullet: true,
+                });
+              }
+            }
           });
         });
       } else {
@@ -145,9 +167,25 @@ export default function PolicyHandbookModal({
               title: cleanT,
               id: `block-${pageNum}-${bIdx}`,
               label: cleanT,
+              isBullet: false,
             });
           }
         });
+
+        // Also index topics from chunks in uploaded documents
+        if (Array.isArray(p.chunks)) {
+          p.chunks.forEach((chk, cIdx) => {
+            if (chk.topic && !list.some((item) => item.pageNum === pageNum && item.title === chk.topic)) {
+              list.push({
+                pageNum,
+                title: chk.topic,
+                id: `chunk-${pageNum}-${cIdx}`,
+                label: chk.topic,
+                isBullet: false,
+              });
+            }
+          });
+        }
       }
     });
     return list;
@@ -159,16 +197,39 @@ export default function PolicyHandbookModal({
     if (activeTab !== "reader") {
       setActiveTab("reader");
     }
-    setTimeout(() => {
-      const el = document.getElementById(topicItem.id);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    const doScroll = (retries = 0) => {
+      const el = document.getElementById(topicItem.id) ||
+                 (topicItem.parentSectionId && document.getElementById(topicItem.parentSectionId));
+      const scrollContainer = scrollContainerRef.current;
+
+      if (el && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const targetScrollTop = elRect.top - containerRect.top + scrollContainer.scrollTop;
+        scrollContainer.scrollTo({
+          top: Math.max(0, targetScrollTop - 25),
+          behavior: "smooth",
+        });
         setFocusedSectionId(topicItem.id);
-        setTimeout(() => setFocusedSectionId(null), 3500);
-      } else if (pageRefs.current[topicItem.pageNum]) {
-        pageRefs.current[topicItem.pageNum]?.scrollIntoView({ behavior: "smooth", block: "start" });
+        setTimeout(() => setFocusedSectionId(null), 4000);
+      } else if (pageRefs.current[topicItem.pageNum] && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const pageRect = pageRefs.current[topicItem.pageNum].getBoundingClientRect();
+        const targetScrollTop = pageRect.top - containerRect.top + scrollContainer.scrollTop;
+        scrollContainer.scrollTo({
+          top: Math.max(0, targetScrollTop - 15),
+          behavior: "smooth",
+        });
+        if (retries < 3) {
+          setTimeout(() => doScroll(retries + 1), 120);
+        }
+      } else if (retries < 4) {
+        setTimeout(() => doScroll(retries + 1), 120);
       }
-    }, 180);
+    };
+
+    setTimeout(() => doScroll(0), 120);
   };
 
   // Sync selected page with initialPage
@@ -181,48 +242,87 @@ export default function PolicyHandbookModal({
   // Auto-scroll to targeted section or initial page when opened
   useEffect(() => {
     if (isOpen && !loading && pages.length > 0) {
-      if (targetSection || targetTopic) {
-        const queryTerm = (targetSection || targetTopic || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-        const matched = allTopics.find((t) => {
-          const cleanTitle = t.title.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const clean = (str) => String(str || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+      const topicClean = clean(targetTopic);
+      const sectionClean = clean(targetSection);
+      const highlightClean = clean(highlightText);
+
+      // Extract section numbers if present (e.g. "3. Leave Policy" -> "3", "Section 4" -> "4")
+      const extractSecNum = (str) => {
+        const m = String(str || "").match(/(?:§\s*|Section\s+|Article\s+)?(\d+)/i);
+        return m ? m[1] : null;
+      };
+
+      const topicSecNum = extractSecNum(targetTopic);
+      const sectionSecNum = extractSecNum(targetSection);
+
+      let matched = null;
+
+      // 1. Try to match on targetTopic first (highest priority)
+      if (topicClean) {
+        // 1a. Exact or slug match on topic title
+        matched = allTopics.find((t) => {
+          const tClean = clean(t.title);
           return (
-            cleanTitle.includes(queryTerm) ||
-            queryTerm.includes(cleanTitle) ||
-            (t.num && String(targetSection).includes(String(t.num)))
+            tClean === topicClean ||
+            (tClean.length >= 4 && topicClean.includes(tClean)) ||
+            (topicClean.length >= 4 && tClean.includes(topicClean))
           );
         });
 
-        if (matched) {
-          jumpToTopic(matched);
-          return;
-        }
-
-        // Fallback: if not matched in allTopics, scroll to initialPage and center on target heading
-        if (initialPage && pageRefs.current[initialPage]) {
-          setSelectedPage(initialPage);
-          setTimeout(() => {
-            const targetEl = document.querySelector(`[data-target-heading="true"]`);
-            if (targetEl) {
-              targetEl.scrollIntoView({ behavior: "smooth", block: "center" });
-            } else {
-              pageRefs.current[initialPage]?.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
-          }, 240);
-          return;
+        // 1b. If topic specified a section number (e.g. "3. Leave Policy"), match section num
+        if (!matched && topicSecNum) {
+          matched = allTopics.find((t) => !t.isBullet && String(t.num) === topicSecNum);
         }
       }
 
-      // Fallback: scroll to initial page
-      if (initialPage && pageRefs.current[initialPage] && activeTab === "reader") {
-        setTimeout(() => {
-          pageRefs.current[initialPage]?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
+      // 2. Try to match on targetSection (if not already matched)
+      if (!matched && sectionClean) {
+        // 2a. If section has a number (e.g. "4. Travel Policy" -> "4"), match that section
+        if (sectionSecNum) {
+          matched = allTopics.find((t) => !t.isBullet && String(t.num) === sectionSecNum);
+        }
+        // 2b. Match section title
+        if (!matched) {
+          matched = allTopics.find((t) => {
+            const tClean = clean(t.title);
+            return tClean === sectionClean || (tClean.length >= 4 && sectionClean.includes(tClean));
           });
-        }, 220);
+        }
+      }
+
+      // 3. Try highlightText
+      if (!matched && highlightClean) {
+        matched = allTopics.find((t) => {
+          const tClean = clean(t.title);
+          return tClean.includes(highlightClean) || highlightClean.includes(tClean);
+        });
+      }
+
+      if (matched) {
+        jumpToTopic(matched);
+        return;
+      }
+
+      // 4. Fallback: if initialPage specified, scroll directly to that page card
+      if (initialPage && activeTab === "reader") {
+        setSelectedPage(initialPage);
+        setTimeout(() => {
+          const scrollContainer = scrollContainerRef.current;
+          if (pageRefs.current[initialPage] && scrollContainer) {
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const pageRect = pageRefs.current[initialPage].getBoundingClientRect();
+            const targetScrollTop = pageRect.top - containerRect.top + scrollContainer.scrollTop;
+            scrollContainer.scrollTo({
+              top: Math.max(0, targetScrollTop - 20),
+              behavior: "smooth",
+            });
+          }
+        }, 180);
       }
     }
-  }, [isOpen, loading, targetSection, targetTopic, initialPage, allTopics]);
+  }, [isOpen, loading, targetSection, targetTopic, highlightText, initialPage, allTopics]);
 
   // Filter & match counts
   const filteredMatches = useMemo(() => {
@@ -273,10 +373,22 @@ export default function PolicyHandbookModal({
   const scrollToPage = (pageNum) => {
     setSelectedPage(pageNum);
     if (activeTab === "reader") {
-      pageRefs.current[pageNum]?.scrollIntoView({
-        behavior: "smooth",
-        block: "start",
-      });
+      const el = pageRefs.current[pageNum];
+      const scrollContainer = scrollContainerRef.current;
+      if (el && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const pageRect = el.getBoundingClientRect();
+        const targetScrollTop = pageRect.top - containerRect.top + scrollContainer.scrollTop;
+        scrollContainer.scrollTo({
+          top: Math.max(0, targetScrollTop - 20),
+          behavior: "smooth",
+        });
+      } else if (el) {
+        el.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }
     }
   };
 
@@ -462,7 +574,7 @@ export default function PolicyHandbookModal({
 
 
         {/* Content View Area */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/50">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/50">
           {activeTab === "raw_pdf" && isDefault ? (
             <div className="w-full h-full min-h-[550px] bg-white rounded-xl overflow-hidden border border-slate-200 flex flex-col shadow-xs">
               <div className="px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 shrink-0">
@@ -483,7 +595,7 @@ export default function PolicyHandbookModal({
                     Topics on Page {selectedPage}:
                   </span>
                   {allTopics
-                    .filter((t) => t.pageNum === selectedPage)
+                    .filter((t) => t.pageNum === selectedPage && !t.isBullet)
                     .map((t, idx) => (
                       <button
                         key={idx}
@@ -662,6 +774,8 @@ export default function PolicyHandbookModal({
 
                               <ul className="space-y-2">
                                 {sec.bullets.map((b, idx) => {
+                                  const bulletId = `section-${sec.num}-bullet-${idx}`;
+                                  const isBulletTarget = focusedSectionId === bulletId;
                                   const hasColon = b.includes(":");
                                   if (hasColon) {
                                     const [label, val] = b.split(":", 1);
@@ -669,29 +783,49 @@ export default function PolicyHandbookModal({
                                     return (
                                       <li
                                         key={idx}
-                                        className="text-xs sm:text-sm text-slate-700 leading-relaxed flex items-start gap-2"
+                                        id={bulletId}
+                                        className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1.5 transition-all duration-300 ${
+                                          isBulletTarget
+                                            ? "bg-indigo-100/90 border border-indigo-500 ring-4 ring-indigo-300/80 shadow-xs text-indigo-950 font-medium"
+                                            : "text-slate-700 hover:bg-slate-50/50"
+                                        }`}
                                       >
                                         <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                           •
                                         </span>
-                                        <div>
+                                        <div className="flex-1">
                                           <strong className="font-semibold text-slate-900">
                                             {highlightTextContent(label.trim())}:
                                           </strong>{" "}
                                           {highlightTextContent(rest.trim())}
                                         </div>
+                                        {isBulletTarget && (
+                                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white shrink-0 shadow-2xs animate-pulse">
+                                            🎯 Topic
+                                          </span>
+                                        )}
                                       </li>
                                     );
                                   }
                                   return (
                                     <li
                                       key={idx}
-                                      className="text-xs sm:text-sm text-slate-700 leading-relaxed flex items-start gap-2"
+                                      id={bulletId}
+                                      className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1.5 transition-all duration-300 ${
+                                        isBulletTarget
+                                          ? "bg-indigo-100/90 border border-indigo-500 ring-4 ring-indigo-300/80 shadow-xs text-indigo-950 font-medium"
+                                          : "text-slate-700 hover:bg-slate-50/50"
+                                      }`}
                                     >
                                       <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                         •
                                       </span>
-                                      <div>{highlightTextContent(b.trim())}</div>
+                                      <div className="flex-1">{highlightTextContent(b.trim())}</div>
+                                      {isBulletTarget && (
+                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white shrink-0 shadow-2xs animate-pulse">
+                                          🎯 Topic
+                                        </span>
+                                      )}
                                     </li>
                                   );
                                 })}
@@ -734,10 +868,11 @@ export default function PolicyHandbookModal({
                               if (block.type === "heading") {
                                 const headingClean = block.text.toLowerCase().replace(/[^a-z0-9]/g, "");
                                 const isTargetHeading =
-                                  Boolean(queryClean) &&
-                                  (headingClean.includes(queryClean) ||
-                                    queryClean.includes(headingClean) ||
-                                    targetTokens.some((tok) => headingClean.includes(tok)));
+                                  focusedSectionId === blockId ||
+                                  (Boolean(queryClean) &&
+                                    (headingClean.includes(queryClean) ||
+                                      queryClean.includes(headingClean) ||
+                                      targetTokens.some((tok) => headingClean.includes(tok))));
 
                                 return (
                                   <h4
@@ -765,8 +900,9 @@ export default function PolicyHandbookModal({
 
                               if (block.type === "bullet") {
                                 const isTargetBullet =
-                                  targetTokens.length > 0 &&
-                                  targetTokens.some((tok) => block.text.toLowerCase().includes(tok));
+                                  focusedSectionId === blockId ||
+                                  (targetTokens.length > 0 &&
+                                    targetTokens.some((tok) => block.text.toLowerCase().includes(tok)));
 
                                 return (
                                   <div

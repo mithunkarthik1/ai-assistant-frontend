@@ -64,7 +64,7 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
         src.filename?.toLowerCase().includes("workpilot");
 
       const rawTopic = (src.topic || "").trim();
-      const rawSection = (src.section || "").trim();
+      let rawSection = (src.section || "").trim();
       let bestTopic = "";
       if (!isGeneric(rawTopic)) {
         bestTopic = rawTopic;
@@ -72,6 +72,18 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
         bestTopic = rawSection;
       } else {
         bestTopic = "";
+      }
+
+      // If topic is generic or missing, extract § or Section topic from assistant's text
+      if (!bestTopic && message.content) {
+        const secMatch = message.content.match(/(?:§\s*(\d+)|\bSection\s+(\d+))[:.\-\s]+([^,\n)]+)/i);
+        if (secMatch) {
+          const extractedTitle = (secMatch[3] || "").replace(/[*_#]/g, "").trim();
+          if (!isGeneric(extractedTitle) && extractedTitle.length >= 3) {
+            bestTopic = extractedTitle;
+            rawSection = secMatch[1] || secMatch[2] || rawSection;
+          }
+        }
       }
 
       const displayName = isDefault ? "Company Policy" : (src.filename || "Document");
@@ -90,6 +102,7 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
         const existing = map.get(docKey);
         if (isGeneric(existing.topic) && !isGeneric(bestTopic)) {
           existing.topic = bestTopic;
+          existing.section = rawSection || existing.section;
           existing.page = src.page || existing.page;
         }
       }
@@ -109,6 +122,22 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
     ).toLowerCase().trim();
 
     const assistantText = (message.content || "").toLowerCase();
+
+    // Greetings should NEVER render document citations
+    const isUserGreeting = [
+      "hi", "hello", "hey", "hola", "namaste", "good morning", "good evening",
+      "good afternoon", "howdy", "sup", "what's up", "whats up", "thanks", "thank you"
+    ].includes(userPrompt.replace(/[^\w\s]/g, "").trim());
+    const isAssistantGreeting =
+      assistantText.startsWith("hello") ||
+      assistantText.startsWith("hi ") ||
+      assistantText.startsWith("hey ") ||
+      assistantText.includes("how can i assist you today") ||
+      assistantText.includes("how can i help you today");
+    if (isUserGreeting || (isAssistantGreeting && userPrompt.length <= 15)) {
+      return [];
+    }
+
     const isNegativeAnswer = [
       "not specified in the retrieved knowledge base",
       "not documented in the current knowledge base",
@@ -198,7 +227,8 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
       );
     });
 
-    if (docMentions.length === 1 && !docMentions[0].isDefault) {
+    // If the assistant answer explicitly cites specific document(s), show ONLY those cited documents
+    if (docMentions.length > 0) {
       return docMentions;
     }
 
