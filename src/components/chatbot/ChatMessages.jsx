@@ -2,28 +2,64 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, Sparkles, Search, Layers, CheckCircle2 } from "lucide-react";
 import ChatMessage from "./ChatMessage";
 
-function ThinkingIndicator() {
-  const [stageIndex, setStageIndex] = useState(0);
+function isDocumentQuery(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase().trim();
 
-  const stages = [
-    { text: "Thinking...", detail: "Analyzing your request", icon: Sparkles, color: "text-indigo-500" },
-    { text: "Searching knowledge base...", detail: "Checking documents", icon: Search, color: "text-blue-500" },
-    { text: "Consolidating...", detail: "Synthesizing answer", icon: Layers, color: "text-violet-500" },
-    { text: "Almost finished...", detail: "Finalizing response", icon: CheckCircle2, color: "text-emerald-500" },
+  // Explicit greeting or simple chit-chat is always generic
+  const greetings = ["hi", "hello", "hey", "greetings", "good morning", "good afternoon", "good evening", "howdy", "sup"];
+  if (greetings.includes(lower) || lower.startsWith("hi ") || lower.startsWith("hello ") || lower.startsWith("hey ")) {
+    return false;
+  }
+
+  // Document/policy keywords
+  const docKeywords = [
+    "policy", "handbook", "document", "documents", "doc", "pdf", "file", "clause",
+    "leave", "pto", "vacation", "sick", "maternity", "paternity", "bereavement",
+    "salary", "expense", "reimbursement", "travel", "flight", "hotel", "allowance",
+    "insurance", "health", "wellness", "dental", "vision", "benefit", "benefits",
+    "remote work", "hybrid", "working hours", "timing", "timings",
+    "harassment", "posh", "code of conduct", "conduct",
+    "password", "mfa", "vpn", "laptop", "security", "data protection",
+    "appraisal", "promotion", "merit", "review",
+    "notice period", "resignation", "exit", "severance", "settlement",
+    "rule", "rules", "guideline", "guidelines", "procedure", "procedures",
+    "knowledge base", "kb", "accord", "according to", "based on",
   ];
 
+  return docKeywords.some((kw) => lower.includes(kw)) || /\.(pdf|txt|docx|doc)\b/i.test(lower);
+}
+
+function ThinkingIndicator({ isDocumentBased = false }) {
+  const [stageIndex, setStageIndex] = useState(0);
+
+  const stages = isDocumentBased
+    ? [
+        { text: "Thinking...", detail: "Analyzing your question", icon: Sparkles, color: "text-indigo-500" },
+        { text: "Searching knowledge base...", detail: "Checking documents", icon: Search, color: "text-blue-500" },
+        { text: "Consolidating...", detail: "Extracting relevant clauses", icon: Layers, color: "text-violet-500" },
+        { text: "Almost finished...", detail: "Synthesizing answer", icon: CheckCircle2, color: "text-emerald-500" },
+      ]
+    : [
+        { text: "Thinking...", detail: "Analyzing your request", icon: Sparkles, color: "text-indigo-500" },
+        { text: "Loading...", detail: "Processing response", icon: Layers, color: "text-blue-500" },
+        { text: "Almost there...", detail: "Finalizing response", icon: CheckCircle2, color: "text-emerald-500" },
+      ];
+
   useEffect(() => {
-    const t1 = setTimeout(() => setStageIndex(1), 2200);
-    const t2 = setTimeout(() => setStageIndex(2), 5000);
-    const t3 = setTimeout(() => setStageIndex(3), 8500);
+    setStageIndex(0);
+    const t1 = setTimeout(() => setStageIndex(1), 1300);
+    const t2 = setTimeout(() => setStageIndex(2), 3000);
+    const t3 = setTimeout(() => setStageIndex(3), 5200);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
     };
-  }, []);
+  }, [isDocumentBased]);
 
-  const currentStage = stages[stageIndex];
+  const activeIndex = Math.min(stageIndex, stages.length - 1);
+  const currentStage = stages[activeIndex];
   const IconComponent = currentStage.icon;
 
   return (
@@ -46,8 +82,8 @@ function ThinkingIndicator() {
           </div>
           <div className="ml-auto pl-1 flex items-center gap-1 select-none">
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '100ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: '200ms' }} />
           </div>
         </div>
       </div>
@@ -135,11 +171,16 @@ export default function ChatMessages({ messages, isSending, error, onPromptClick
             message={msg}
             previousMessage={index > 0 ? messages[index - 1] : null}
             onOpenHandbook={onOpenHandbook}
+            onPromptClick={onPromptClick}
           />
         ))}
 
         {/* Dynamic Multi-Stage Thinking State */}
-        {isSending && <ThinkingIndicator />}
+        {isSending && (
+          <ThinkingIndicator
+            isDocumentBased={isDocumentQuery([...messages].reverse().find((m) => m.role === "user")?.content)}
+          />
+        )}
 
         {/* Error Notice */}
         {error && (

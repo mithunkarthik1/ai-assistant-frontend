@@ -3,7 +3,7 @@ import { Bot, User, Copy, Check, FileText } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { getPolicyPdfUrl } from "../../services/chatService";
 
-export default function ChatMessage({ message, previousMessage, onOpenHandbook }) {
+export default function ChatMessage({ message, previousMessage, onOpenHandbook, onPromptClick }) {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const pdfUrl = getPolicyPdfUrl();
@@ -53,6 +53,31 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
       return false;
     };
 
+    const userWords = (previousMessage?.role === "user" ? previousMessage.content : "")
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 3 && !["what", "the", "and", "for", "with", "about", "how", "are", "can", "tell"].includes(w));
+
+    // Rate how accurately a candidate topic matches the user question
+    const rateTopicRelevance = (topicStr, sectionStr) => {
+      const combined = `${topicStr || ""} ${sectionStr || ""}`.toLowerCase();
+      if (!combined.trim() || isGeneric(topicStr)) return -10;
+      let score = 0;
+      for (const w of userWords) {
+        if (combined.includes(w)) score += 20;
+      }
+      // If user did NOT explicitly ask for encashment, penalize "encashment" so leave policy/guidelines is favored
+      if (!userWords.includes("encashment") && combined.includes("encashment")) {
+        score -= 25;
+      }
+      // Reward exact phrases like "leave policy", "pto", "guidelines"
+      if (combined.includes("leave policy") || combined.includes("guidelines for leave") || combined.includes("paid time off")) {
+        score += 15;
+      }
+      return score;
+    };
+
     for (const src of message.sources) {
       const docKey = src.document_id || src.filename;
       if (!docKey) continue;
@@ -87,6 +112,7 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
       }
 
       const displayName = isDefault ? "Company Policy" : (src.filename || "Document");
+      const currentScore = rateTopicRelevance(bestTopic, rawSection);
 
       if (!map.has(docKey)) {
         map.set(docKey, {
@@ -97,19 +123,27 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
           page: src.page || 1,
           topic: bestTopic,
           section: rawSection,
+          relevanceScore: currentScore,
         });
       } else {
         const existing = map.get(docKey);
-        if (isGeneric(existing.topic) && !isGeneric(bestTopic)) {
+        // Replace with higher relevance topic for the user question
+        if (currentScore > (existing.relevanceScore ?? -99)) {
           existing.topic = bestTopic;
           existing.section = rawSection || existing.section;
           existing.page = src.page || existing.page;
+          existing.relevanceScore = currentScore;
+        } else if (isGeneric(existing.topic) && !isGeneric(bestTopic)) {
+          existing.topic = bestTopic;
+          existing.section = rawSection || existing.section;
+          existing.page = src.page || existing.page;
+          existing.relevanceScore = currentScore;
         }
       }
     }
 
     return Array.from(map.values());
-  }, [message.sources]);
+  }, [message.sources, message.content, previousMessage]);
 
   // Determine if the user inquiry specifically targeted a particular PDF/document.
   // When a user asks about one specific PDF ("in ms leave policy", "what bubble sort?"),
@@ -241,6 +275,43 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
     return uniqueCitedDocs;
   }, [uniqueCitedDocs, previousMessage, message.content]);
 
+  // Detect if this assistant message is asking the user to specify/clarify which document
+  const isDocumentClarification = useMemo(() => {
+    if (isUser || !message.content) return false;
+    const lower = message.content.toLowerCase();
+    return (
+      lower.includes("specify which document") ||
+      lower.includes("multiple documents in the knowledge base") ||
+      lower.includes("which document would you like to consult")
+    );
+  }, [isUser, message.content]);
+
+  // Candidate documents for interactive clarification buttons
+  const clarificationDocs = useMemo(() => {
+    if (!isDocumentClarification) return [];
+    if (displayDocs && displayDocs.length > 0) return displayDocs;
+
+    // Extract document names from bullet points in message.content
+    const docs = [];
+    const bulletRegex = /(?:•|\*|-)\s*\*\*?([^*]+?\.(?:pdf|docx|txt|md)|[^*]+?)\*\*?/gi;
+    let match;
+    while ((match = bulletRegex.exec(message.content)) !== null) {
+      const name = match[1].trim();
+      if (name && name.length >= 3 && !docs.some(d => d.rawFilename === name)) {
+        docs.push({
+          documentId: null,
+          filename: name,
+          rawFilename: name,
+          isDefault: name.toLowerCase().includes("workpilot"),
+          page: 1,
+          topic: "",
+          section: "",
+        });
+      }
+    }
+    return docs;
+  }, [isDocumentClarification, displayDocs, message.content]);
+
   return (
     <div
       className={`group flex items-start gap-2.5 ${
@@ -342,8 +413,44 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook }
         </div>
 
 
+        {/* Document Disambiguation / Clarification Action Buttons */}
+        {isDocumentClarification && clarificationDocs.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1.5 w-full max-w-md">
+            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+              <span>👉</span>
+              <span>Click document to get specific answer:</span>
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {clarificationDocs.map((doc, idx) => {
+                const isViolet = !doc.isDefault;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      const prevQ = previousMessage?.role === "user" ? previousMessage.content : "";
+                      const promptText = prevQ ? `In ${doc.rawFilename}: ${prevQ}` : doc.rawFilename;
+                      if (onPromptClick) {
+                        onPromptClick(promptText);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-2xs hover:shadow-xs group/btn ${
+                      isViolet
+                        ? "bg-violet-50 hover:bg-violet-100 text-violet-800 border-violet-200"
+                        : "bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-200"
+                    }`}
+                  >
+                    <FileText className={`w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform ${isViolet ? "text-violet-600" : "text-indigo-600"}`} />
+                    <span>{doc.rawFilename}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Document Handbook Action Chips: shows compact chips for cited PDF(s) */}
-        {hasDocumentSources && displayDocs.length > 0 && (
+        {!isDocumentClarification && hasDocumentSources && displayDocs.length > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5 max-w-full">
             {displayDocs.map((doc, idx) => {
               const isViolet = !doc.isDefault;
