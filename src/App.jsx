@@ -18,7 +18,7 @@ export default function App() {
       <div className="text-center max-w-2xl">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-200/80 text-slate-700 text-xs font-semibold mb-4 border border-slate-300/60">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>WorkPilot Enterprise Knowledge Base</span>
+          <span>Enterprise Knowledge Base</span>
         </div>
 
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900">

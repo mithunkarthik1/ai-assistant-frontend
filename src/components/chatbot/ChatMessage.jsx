@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Bot, User, Copy, Check, FileText } from "lucide-react";
+import { Bot, User, Copy, Check, FileText, ExternalLink } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { getPolicyPdfUrl } from "../../services/chatService";
 
@@ -30,13 +30,8 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
     }
   };
 
-  // Only show handbook chips when the answer is grounded in / answered from documents
-  const hasDocumentSources = !isUser && Boolean(message.sources && message.sources.length > 0);
-
   // Group unique cited documents and pick their most specific topic
   const uniqueCitedDocs = useMemo(() => {
-    if (!message.sources || message.sources.length === 0) return [];
-
     const map = new Map();
     const isGeneric = (t) => {
       if (!t) return true;
@@ -78,7 +73,27 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
       return score;
     };
 
-    for (const src of message.sources) {
+    const candidateSources = [...(message.sources || [])];
+
+    // Fallback: If no sources provided in payload but message cites document inline, extract citation
+    if (candidateSources.length === 0 && message.content && !isUser) {
+      const citeRegex = /\(([A-Za-z0-9_.\- ]+\.(?:pdf|docx|txt))(?:\s*,\s*([^,)\n]+))?(?:\s*,\s*Page\s*(\d+))?\)/gi;
+      let match;
+      while ((match = citeRegex.exec(message.content)) !== null) {
+        const fname = match[1].trim();
+        const sec = match[2] ? match[2].trim() : "";
+        const pg = match[3] ? parseInt(match[3], 10) : 1;
+        candidateSources.push({
+          filename: fname,
+          document_id: fname.toLowerCase().includes("workpilot") ? "00000000-0000-0000-0000-000000000002" : null,
+          page: pg,
+          section: sec,
+          topic: sec,
+        });
+      }
+    }
+
+    for (const src of candidateSources) {
       const docKey = src.document_id || src.filename;
       if (!docKey) continue;
 
@@ -143,7 +158,13 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
     }
 
     return Array.from(map.values());
-  }, [message.sources, message.content, previousMessage]);
+  }, [message.sources, message.content, previousMessage, isUser]);
+
+  // Only show handbook chips when the answer is grounded in / answered from documents
+  const hasDocumentSources = !isUser && (
+    Boolean(message.sources && message.sources.length > 0) ||
+    uniqueCitedDocs.length > 0
+  );
 
   // Determine if the user inquiry specifically targeted a particular PDF/document.
   // When a user asks about one specific PDF ("in ms leave policy", "what bubble sort?"),
@@ -275,42 +296,30 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
     return uniqueCitedDocs;
   }, [uniqueCitedDocs, previousMessage, message.content]);
 
+  // Clean raw **Grounding:** line, ensure bullet points start on separate paragraphs, and sanitize phrasing
+  const cleanedContent = useMemo(() => {
+    if (isUser || !message.content) return message.content;
+    let content = message.content
+      .replace(/\n*\*\*Grounding:\*\*\s*(?:Fully Supported|Partially Supported|Not Documented)\s*$/i, "")
+      .replace(/Please select which document you would like to consult, or ask to \*\*compare both\*\*\.?/gi, "Please specify which document you would like to consult.")
+      .replace(/([^\n])\s*•\s*/g, "$1\n\n• ")
+      .replace(/\n{1,2}•\s*/g, "\n\n• ")
+      .replace(/([^\n])\s*(Please (?:select|specify) which document)/gi, "$1\n\n$2")
+      .trim();
+    return content;
+  }, [isUser, message.content]);
+
   // Detect if this assistant message is asking the user to specify/clarify which document
   const isDocumentClarification = useMemo(() => {
     if (isUser || !message.content) return false;
     const lower = message.content.toLowerCase();
     return (
       lower.includes("specify which document") ||
+      lower.includes("select which document") ||
       lower.includes("multiple documents in the knowledge base") ||
       lower.includes("which document would you like to consult")
     );
   }, [isUser, message.content]);
-
-  // Candidate documents for interactive clarification buttons
-  const clarificationDocs = useMemo(() => {
-    if (!isDocumentClarification) return [];
-    if (displayDocs && displayDocs.length > 0) return displayDocs;
-
-    // Extract document names from bullet points in message.content
-    const docs = [];
-    const bulletRegex = /(?:•|\*|-)\s*\*\*?([^*]+?\.(?:pdf|docx|txt|md)|[^*]+?)\*\*?/gi;
-    let match;
-    while ((match = bulletRegex.exec(message.content)) !== null) {
-      const name = match[1].trim();
-      if (name && name.length >= 3 && !docs.some(d => d.rawFilename === name)) {
-        docs.push({
-          documentId: null,
-          filename: name,
-          rawFilename: name,
-          isDefault: name.toLowerCase().includes("workpilot"),
-          page: 1,
-          topic: "",
-          section: "",
-        });
-      }
-    }
-    return docs;
-  }, [isDocumentClarification, displayDocs, message.content]);
 
   return (
     <div
@@ -406,48 +415,11 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
                   ),
                 }}
               >
-                {message.content}
+                {cleanedContent}
               </ReactMarkdown>
             </div>
           )}
         </div>
-
-
-        {/* Document Disambiguation / Clarification Action Buttons */}
-        {isDocumentClarification && clarificationDocs.length > 0 && (
-          <div className="mt-2 flex flex-col gap-1.5 w-full max-w-md">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-              <span>👉</span>
-              <span>Click document to get specific answer:</span>
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {clarificationDocs.map((doc, idx) => {
-                const isViolet = !doc.isDefault;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => {
-                      const prevQ = previousMessage?.role === "user" ? previousMessage.content : "";
-                      const promptText = prevQ ? `In ${doc.rawFilename}: ${prevQ}` : doc.rawFilename;
-                      if (onPromptClick) {
-                        onPromptClick(promptText);
-                      }
-                    }}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer shadow-2xs hover:shadow-xs group/btn ${
-                      isViolet
-                        ? "bg-violet-50 hover:bg-violet-100 text-violet-800 border-violet-200"
-                        : "bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border-indigo-200"
-                    }`}
-                  >
-                    <FileText className={`w-3.5 h-3.5 group-hover/btn:scale-110 transition-transform ${isViolet ? "text-violet-600" : "text-indigo-600"}`} />
-                    <span>{doc.rawFilename}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Document Handbook Action Chips: shows compact chips for cited PDF(s) */}
         {!isDocumentClarification && hasDocumentSources && displayDocs.length > 0 && (
