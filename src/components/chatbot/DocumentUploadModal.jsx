@@ -297,7 +297,8 @@ export default function DocumentUploadModal({ isOpen, onClose, onUploadSuccess }
                 {documents.map((doc) => {
                   const isDefaultDoc =
                     Boolean(doc.is_default) ||
-                    doc.document_id === "00000000-0000-0000-0000-000000000002";
+                    doc.document_id === "00000000-0000-0000-0000-000000000002" ||
+                    doc.file_name === "WorkPilot_Company_Policy.pdf";
                   return (
                     <div
                       key={doc.document_id}
