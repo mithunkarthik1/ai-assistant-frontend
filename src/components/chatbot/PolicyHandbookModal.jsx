@@ -10,6 +10,7 @@ import {
   ArrowUpRight,
   CheckCircle2,
 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { getDocumentPages, getPolicyPdfUrl } from "../../services/chatService";
 
 function parseDocumentBlocks(rawText) {
@@ -83,6 +84,7 @@ export default function PolicyHandbookModal({
   isDefault = true,
 }) {
   const [pages, setPages] = useState([]);
+  const [docFileType, setDocFileType] = useState("");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("reader"); // "reader" | "raw_pdf"
@@ -101,6 +103,12 @@ export default function PolicyHandbookModal({
     }
   }, [isDefault, documentId]);
 
+  // Reset search query and focused section whenever modal opens, closes, or document changes
+  useEffect(() => {
+    setSearchQuery("");
+    setFocusedSectionId(null);
+  }, [isOpen, documentId]);
+
   // Load structured pages when modal opens or document changes
   useEffect(() => {
     async function loadPages() {
@@ -108,6 +116,7 @@ export default function PolicyHandbookModal({
         setLoading(true);
         const data = await getDocumentPages(documentId);
         setPages(data.pages || []);
+        setDocFileType(data.file_type || "");
         loadedDocIdRef.current = documentId;
       } catch (err) {
         console.error("Failed to load document pages:", err);
@@ -115,7 +124,7 @@ export default function PolicyHandbookModal({
         setLoading(false);
       }
     }
-    if (isOpen && (loadedDocIdRef.current !== documentId || pages.length === 0)) {
+    if (isOpen) {
       loadPages();
     }
   }, [isOpen, documentId]);
@@ -158,29 +167,63 @@ export default function PolicyHandbookModal({
         });
       } else {
         const pageText = p.content || (p.chunks ? p.chunks.map((c) => c.content).join("\n\n") : "");
-        const blocks = parseDocumentBlocks(pageText);
-        blocks.forEach((b, bIdx) => {
-          if (b.type === "heading") {
-            const cleanT = b.text.replace(/[:.]/g, "").trim();
-            list.push({
-              pageNum,
-              title: cleanT,
-              id: `block-${pageNum}-${bIdx}`,
-              label: cleanT,
-              isBullet: false,
-            });
+        const lines = pageText.split("\n");
+        let foundMdHeadings = false;
+
+        // 1. Extract markdown headings (#, ##, ###)
+        lines.forEach((l) => {
+          const m = l.match(/^(#{1,6})\s+(.+)$/);
+          if (m) {
+            foundMdHeadings = true;
+            const level = m[1].length;
+            const rawTitle = m[2].replace(/[*_`]/g, "").trim();
+            const slug = rawTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            if (rawTitle.length >= 2 && !list.some((item) => item.pageNum === pageNum && item.title === rawTitle)) {
+              list.push({
+                pageNum,
+                title: rawTitle,
+                id: `heading-${slug}`,
+                label: level <= 2 ? rawTitle : `• ${rawTitle}`,
+                isBullet: level > 2,
+              });
+            }
           }
         });
 
-        // Also index topics from chunks in uploaded documents
-        if (Array.isArray(p.chunks)) {
-          p.chunks.forEach((chk, cIdx) => {
-            if (chk.topic && !list.some((item) => item.pageNum === pageNum && item.title === chk.topic)) {
+        // 2. Fallback to parseDocumentBlocks if no markdown headings
+        if (!foundMdHeadings) {
+          const blocks = parseDocumentBlocks(pageText);
+          blocks.forEach((b, bIdx) => {
+            if (b.type === "heading") {
+              const cleanT = b.text.replace(/[:.]/g, "").trim();
+              const slug = cleanT.toLowerCase().replace(/[^a-z0-9]+/g, "-");
               list.push({
                 pageNum,
-                title: chk.topic,
-                id: `chunk-${pageNum}-${cIdx}`,
-                label: chk.topic,
+                title: cleanT,
+                id: `heading-${slug}`,
+                label: cleanT,
+                isBullet: false,
+              });
+            }
+          });
+        }
+
+        // 3. Also index unique chunk topics from uploaded documents
+        if (Array.isArray(p.chunks)) {
+          p.chunks.forEach((chk) => {
+            const topic = (chk.topic || chk.section || "").trim();
+            const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            if (
+              topic &&
+              topic !== "General" &&
+              topic !== "Overview" &&
+              !list.some((item) => item.pageNum === pageNum && item.title === topic)
+            ) {
+              list.push({
+                pageNum,
+                title: topic,
+                id: `heading-${slug}`,
+                label: topic,
                 isBullet: false,
               });
             }
@@ -199,7 +242,9 @@ export default function PolicyHandbookModal({
     }
 
     const doScroll = (retries = 0) => {
+      const topicSlug = topicItem.title?.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       const el = document.getElementById(topicItem.id) ||
+                 (topicSlug && document.getElementById(`heading-${topicSlug}`)) ||
                  (topicItem.parentSectionId && document.getElementById(topicItem.parentSectionId));
       const scrollContainer = scrollContainerRef.current;
 
@@ -392,27 +437,16 @@ export default function PolicyHandbookModal({
     }
   };
 
-  // Helper to highlight matching text
+  // Helper to highlight matching text only when user explicitly searches in the reader search box
   const highlightTextContent = (text) => {
     if (!text) return "";
-    const activeQuery = (searchQuery.trim() || highlightText.trim()).trim();
-    if (!activeQuery) return text;
+    const activeQuery = searchQuery.trim();
+    if (!activeQuery) return text; // Clean, natural reading when browsing or jumping to pages
 
-    const words = activeQuery
-      .split(/\s+/)
-      .map((w) => w.trim())
-      .filter((w) => w.length > 2 && !["the", "and", "for", "with", "from", "policy", "doc", "document"].includes(w.toLowerCase()));
-
-    const termsToMatch = Array.from(new Set([activeQuery, ...words])).filter(Boolean);
-    const pattern = termsToMatch
-      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-      .join("|");
-
-    if (!pattern) return text;
-
+    const pattern = activeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const parts = String(text).split(new RegExp(`(${pattern})`, "gi"));
     return parts.map((part, i) => {
-      const isMatch = termsToMatch.some((t) => t.toLowerCase() === part.toLowerCase());
+      const isMatch = part.toLowerCase() === activeQuery.toLowerCase();
       return isMatch ? (
         <mark key={i} className="bg-amber-200 text-amber-950 font-semibold px-0.5 rounded shadow-2xs">
           {part}
@@ -423,11 +457,23 @@ export default function PolicyHandbookModal({
     });
   };
 
+  const handleClose = () => {
+    setSearchQuery("");
+    setFocusedSectionId(null);
+    if (onClose) onClose();
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl h-[92vh] max-h-[880px] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={handleClose}
+    >
+      <div
+        className="relative w-full max-w-5xl h-[92vh] max-h-[880px] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Top Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50/90">
           <div className="flex items-center gap-2.5">
@@ -436,9 +482,9 @@ export default function PolicyHandbookModal({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
-                {isDefault ? "WorkPilot Official Policy Handbook" : `${documentName} Handbook`}
+                {isDefault ? "Company Policy Handbook" : documentName}
                 <span className="hidden sm:inline-block text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full">
-                  {isDefault ? "Verified PDF • 5 Pages" : `Document Handbook • ${pages.length} Pages`}
+                  {isDefault ? "Verified PDF • 5 Pages" : `Document Handbook • ${pages.length} ${pages.length === 1 ? "Page" : "Pages"}`}
                 </span>
               </h2>
               <p className="text-xs text-slate-500 hidden sm:block">
@@ -475,7 +521,7 @@ export default function PolicyHandbookModal({
               </>
             )}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer"
               aria-label="Close handbook modal"
             >
@@ -572,6 +618,36 @@ export default function PolicyHandbookModal({
           </div>
         </div>
 
+        {/* Topics strip in reader mode */}
+        {activeTab === "reader" && allTopics.length > 0 && (
+          <div className="flex items-center gap-2 overflow-x-auto px-4 sm:px-6 py-1.5 bg-slate-100/80 border-b border-slate-200 text-xs shrink-0">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block" />
+              Topics:
+            </span>
+            <div className="flex items-center gap-1.5 overflow-x-auto py-0.5">
+              {allTopics
+                .filter((t) => !t.isBullet || t.pageNum === selectedPage)
+                .slice(0, 18)
+                .map((t, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => jumpToTopic(t)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer shrink-0 border shadow-2xs ${
+                      selectedPage === t.pageNum
+                        ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                        : "bg-white text-slate-600 border-slate-200 hover:text-slate-900 hover:border-slate-300"
+                    }`}
+                    title={`Jump to ${t.title} on Page ${t.pageNum}`}
+                  >
+                    {t.label || t.title}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
+
 
         {/* Content View Area */}
         <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/50">
@@ -631,7 +707,7 @@ export default function PolicyHandbookModal({
                   <iframe
                     key={`pdf-frame-${selectedPage}`}
                     src={`${pdfUrl}#page=${selectedPage}`}
-                    title="WorkPilot Official Policy Handbook PDF"
+                    title="Company Policy Handbook PDF"
                     className="w-full h-full min-h-[520px] border-none"
                   >
                     <div className="flex flex-col items-center justify-center h-full p-8 text-center text-slate-600">
@@ -725,21 +801,12 @@ export default function PolicyHandbookModal({
                               key={sec.num}
                               id={secId}
                               data-section-title={sec.title}
-                              className={`p-4 rounded-xl transition-all duration-500 ${
-                                isTarget
-                                  ? "bg-indigo-50/80 border-2 border-indigo-500 ring-4 ring-indigo-200/70 shadow-md"
-                                  : "bg-slate-50/50 border border-slate-100 hover:border-slate-200"
-                              }`}
+                              className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs"
                             >
                               <div className="flex items-start justify-between gap-3 mb-2">
                                 <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
                                   <span className="text-indigo-600 font-extrabold">§ {sec.num}.</span>
                                   <span>{highlightTextContent(sec.title)}</span>
-                                  {isTarget && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white shadow-xs animate-pulse">
-                                      🎯 Selected Topic
-                                    </span>
-                                  )}
                                 </h3>
 
                                 <div className="flex items-center gap-1 shrink-0">
@@ -767,7 +834,7 @@ export default function PolicyHandbookModal({
                               </div>
 
                               {sec.intro && (
-                                <p className="text-xs sm:text-sm text-slate-600 italic bg-white p-2.5 rounded-lg border border-slate-200/70 mb-3">
+                                <p className="text-xs sm:text-sm text-slate-600 italic bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/60 mb-3">
                                   {highlightTextContent(sec.intro)}
                                 </p>
                               )}
@@ -775,7 +842,6 @@ export default function PolicyHandbookModal({
                               <ul className="space-y-2">
                                 {sec.bullets.map((b, idx) => {
                                   const bulletId = `section-${sec.num}-bullet-${idx}`;
-                                  const isBulletTarget = focusedSectionId === bulletId;
                                   const hasColon = b.includes(":");
                                   if (hasColon) {
                                     const [label, val] = b.split(":", 1);
@@ -784,11 +850,7 @@ export default function PolicyHandbookModal({
                                       <li
                                         key={idx}
                                         id={bulletId}
-                                        className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1.5 transition-all duration-300 ${
-                                          isBulletTarget
-                                            ? "bg-indigo-100/90 border border-indigo-500 ring-4 ring-indigo-300/80 shadow-xs text-indigo-950 font-medium"
-                                            : "text-slate-700 hover:bg-slate-50/50"
-                                        }`}
+                                        className="text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 text-slate-700"
                                       >
                                         <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                           •
@@ -799,11 +861,6 @@ export default function PolicyHandbookModal({
                                           </strong>{" "}
                                           {highlightTextContent(rest.trim())}
                                         </div>
-                                        {isBulletTarget && (
-                                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white shrink-0 shadow-2xs animate-pulse">
-                                            🎯 Topic
-                                          </span>
-                                        )}
                                       </li>
                                     );
                                   }
@@ -811,21 +868,12 @@ export default function PolicyHandbookModal({
                                     <li
                                       key={idx}
                                       id={bulletId}
-                                      className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1.5 transition-all duration-300 ${
-                                        isBulletTarget
-                                          ? "bg-indigo-100/90 border border-indigo-500 ring-4 ring-indigo-300/80 shadow-xs text-indigo-950 font-medium"
-                                          : "text-slate-700 hover:bg-slate-50/50"
-                                      }`}
+                                      className="text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 text-slate-700"
                                     >
                                       <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                         •
                                       </span>
                                       <div className="flex-1">{highlightTextContent(b.trim())}</div>
-                                      {isBulletTarget && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white shrink-0 shadow-2xs animate-pulse">
-                                          🎯 Topic
-                                        </span>
-                                      )}
                                     </li>
                                   );
                                 })}
@@ -835,11 +883,12 @@ export default function PolicyHandbookModal({
                         })}
                       </div>
                     ) : (
-                      /* Format B: Uploaded document page rendered in normal PDF document format */
+                      /* Format B: Uploaded document page rendered in structured format */
                       <div className="space-y-4">
                         {pageData.title && pageData.title !== `Page ${pageNum}` && (
-                          <div className="font-bold text-slate-900 text-sm sm:text-base border-b border-slate-100 pb-2 mb-2">
-                            {highlightTextContent(pageData.title)}
+                          <div className="font-bold text-slate-900 text-sm sm:text-base border-b border-slate-100 pb-2 mb-2 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+                            <span>{highlightTextContent(pageData.title)}</span>
                           </div>
                         )}
                         <div className="space-y-2.5">
@@ -847,9 +896,8 @@ export default function PolicyHandbookModal({
                             const pageText =
                               pageData.content ||
                               (pageData.chunks ? pageData.chunks.map((c) => c.content).join("\n\n") : "");
-                            const blocks = parseDocumentBlocks(pageText);
 
-                            if (blocks.length === 0) {
+                            if (!pageText.trim()) {
                               return (
                                 <p className="text-xs sm:text-sm text-slate-500 italic">
                                   No textual content available on this page.
@@ -857,72 +905,135 @@ export default function PolicyHandbookModal({
                               );
                             }
 
-                            const queryTarget = (targetTopic || targetSection || highlightText || "").toLowerCase().trim();
-                            const queryClean = queryTarget.replace(/[^a-z0-9]/g, "");
-                            const targetTokens = queryTarget
-                              .split(/\s+/)
-                              .filter((w) => w.length > 2 && !["the", "and", "for", "with", "from", "policy"].includes(w));
+                            const isMarkdownDoc =
+                              docFileType === "md" ||
+                              docFileType === "markdown" ||
+                              documentName.toLowerCase().endsWith(".md") ||
+                              documentName.toLowerCase().endsWith(".markdown") ||
+                              pageText.includes("# ") ||
+                              pageText.includes("```");
+
+                            const renderHighlighted = (content) => {
+                              if (!searchQuery.trim()) return content;
+                              if (typeof content === "string") {
+                                return highlightTextContent(content);
+                              }
+                              if (Array.isArray(content)) {
+                                return content.map((c, i) =>
+                                  typeof c === "string" ? <span key={i}>{highlightTextContent(c)}</span> : c
+                                );
+                              }
+                              return content;
+                            };
+
+                            if (isMarkdownDoc) {
+                              return (
+                                <div className="text-slate-800 leading-relaxed space-y-3">
+                                  <ReactMarkdown
+                                    components={{
+                                      h1: ({ children }) => {
+                                        const text = String(children);
+                                        const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+                                        return (
+                                          <h2 id={`heading-${slug}`} className="text-base sm:text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 mt-4 mb-3 flex items-center gap-2">
+                                            <span className="w-1.5 h-4 bg-indigo-600 rounded-full inline-block shrink-0" />
+                                            <span>{renderHighlighted(children)}</span>
+                                          </h2>
+                                        );
+                                      },
+                                      h2: ({ children }) => {
+                                        const text = String(children);
+                                        const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+                                        return (
+                                          <h3 id={`heading-${slug}`} className="text-sm sm:text-base font-bold text-slate-900 border-b border-slate-100 pb-1.5 mt-4 mb-2 flex items-center gap-2">
+                                            <span className="w-1.5 h-3.5 bg-indigo-500 rounded-full inline-block shrink-0" />
+                                            <span>{renderHighlighted(children)}</span>
+                                          </h3>
+                                        );
+                                      },
+                                      h3: ({ children }) => {
+                                        const text = String(children);
+                                        const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+                                        return (
+                                          <h4 id={`heading-${slug}`} className="text-xs sm:text-sm font-semibold text-slate-800 mt-3 mb-1.5 flex items-center gap-1.5">
+                                            <span className="w-1 h-2.5 bg-indigo-400 rounded-full inline-block shrink-0" />
+                                            <span>{renderHighlighted(children)}</span>
+                                          </h4>
+                                        );
+                                      },
+                                      code: ({ inline, children }) => {
+                                        if (inline) {
+                                          return (
+                                            <code className="px-1.5 py-0.5 rounded bg-slate-100 text-indigo-700 font-mono text-xs border border-slate-200">
+                                              {children}
+                                            </code>
+                                          );
+                                        }
+                                        return (
+                                          <div className="my-3 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 shadow-xs">
+                                            <div className="px-3 py-1 bg-slate-800 border-b border-slate-700 text-[11px] text-slate-400 font-mono flex items-center justify-between">
+                                              <span>Code / Structured Content</span>
+                                            </div>
+                                            <pre className="p-3.5 text-xs text-slate-100 font-mono overflow-x-auto leading-relaxed">
+                                              <code>{children}</code>
+                                            </pre>
+                                          </div>
+                                        );
+                                      },
+                                      table: ({ children }) => (
+                                        <div className="overflow-x-auto my-3 rounded-lg border border-slate-200 shadow-2xs bg-white">
+                                          <table className="w-full text-xs text-left text-slate-700 border-collapse">{children}</table>
+                                        </div>
+                                      ),
+                                      thead: ({ children }) => <thead className="bg-slate-100 text-slate-900 font-semibold border-b border-slate-200">{children}</thead>,
+                                      th: ({ children }) => <th className="px-3 py-2 border-r border-slate-200 last:border-r-0 font-semibold">{children}</th>,
+                                      td: ({ children }) => <td className="px-3 py-2 border-b border-r border-slate-200 last:border-r-0 bg-white">{children}</td>,
+                                      ul: ({ children }) => <ul className="space-y-1.5 my-2 pl-4 list-disc marker:text-indigo-500 text-xs sm:text-sm text-slate-700">{children}</ul>,
+                                      ol: ({ children }) => <ol className="space-y-1.5 my-2 pl-4 list-decimal marker:text-indigo-600 font-medium text-xs sm:text-sm text-slate-700">{children}</ol>,
+                                      li: ({ children }) => <li className="leading-relaxed">{renderHighlighted(children)}</li>,
+                                      p: ({ children }) => <p className="text-xs sm:text-sm text-slate-800 leading-relaxed my-2">{renderHighlighted(children)}</p>,
+                                      blockquote: ({ children }) => (
+                                        <blockquote className="border-l-4 border-indigo-400 pl-3.5 py-1.5 my-2 bg-indigo-50/40 text-slate-700 text-xs sm:text-sm italic rounded-r">
+                                          {children}
+                                        </blockquote>
+                                      ),
+                                      hr: () => <hr className="my-4 border-slate-200" />,
+                                    }}
+                                  >
+                                    {pageText}
+                                  </ReactMarkdown>
+                                </div>
+                              );
+                            }
+
+                            const blocks = parseDocumentBlocks(pageText);
 
                             return blocks.map((block, bIdx) => {
                               const blockId = `block-${pageNum}-${bIdx}`;
                               if (block.type === "heading") {
-                                const headingClean = block.text.toLowerCase().replace(/[^a-z0-9]/g, "");
-                                const isTargetHeading =
-                                  focusedSectionId === blockId ||
-                                  (Boolean(queryClean) &&
-                                    (headingClean.includes(queryClean) ||
-                                      queryClean.includes(headingClean) ||
-                                      targetTokens.some((tok) => headingClean.includes(tok))));
-
                                 return (
                                   <h4
                                     key={bIdx}
                                     id={blockId}
-                                    data-target-heading={isTargetHeading ? "true" : undefined}
-                                    className={`font-bold text-xs sm:text-sm pt-2.5 pb-2 px-3 rounded-xl border flex items-center justify-between gap-2 transition-all duration-500 my-2 ${
-                                      isTargetHeading
-                                        ? "bg-violet-100/90 border-2 border-violet-500 text-violet-950 ring-4 ring-violet-200/80 shadow-md"
-                                        : "bg-transparent border-b border-slate-100 text-slate-900"
-                                    }`}
+                                    className="font-bold text-xs sm:text-sm pt-2.5 pb-1.5 text-slate-900 border-b border-slate-100 flex items-center gap-2 my-2"
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <span className="w-1.5 h-3.5 bg-violet-600 rounded-full inline-block shrink-0" />
-                                      <span>{highlightTextContent(block.text)}</span>
-                                    </div>
-                                    {isTargetHeading && (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-600 text-white shadow-xs animate-pulse shrink-0">
-                                        🎯 Referenced Topic
-                                      </span>
-                                    )}
+                                    <span className="w-1.5 h-3.5 bg-indigo-600 rounded-full inline-block shrink-0" />
+                                    <span>{highlightTextContent(block.text)}</span>
                                   </h4>
                                 );
                               }
 
                               if (block.type === "bullet") {
-                                const isTargetBullet =
-                                  focusedSectionId === blockId ||
-                                  (targetTokens.length > 0 &&
-                                    targetTokens.some((tok) => block.text.toLowerCase().includes(tok)));
-
                                 return (
                                   <div
                                     key={bIdx}
                                     id={blockId}
-                                    className={`flex items-start gap-2 text-xs sm:text-sm leading-relaxed p-1.5 rounded-lg transition-all duration-300 ${
-                                      isTargetBullet
-                                        ? "bg-violet-50/90 border border-violet-200/90 ring-2 ring-violet-300/40 shadow-2xs text-slate-900"
-                                        : "text-slate-700 pl-1"
-                                    }`}
+                                    className="flex items-start gap-2 text-xs sm:text-sm leading-relaxed p-1 text-slate-700"
                                   >
-                                    <span className="text-violet-600 font-bold shrink-0 mt-0.5 select-none">•</span>
+                                    <span className="text-indigo-600 font-bold shrink-0 mt-0.5 select-none">•</span>
                                     <div className="flex-1 leading-relaxed">
                                       {highlightTextContent(block.text)}
                                     </div>
-                                    {isTargetBullet && (
-                                      <span className="text-[10px] font-bold text-violet-700 bg-violet-100/80 px-1.5 py-0.5 rounded shrink-0">
-                                        📍 Cited
-                                      </span>
-                                    )}
                                   </div>
                                 );
                               }

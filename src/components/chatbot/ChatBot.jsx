@@ -256,6 +256,16 @@ export default function ChatBot() {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadSuccess={handleUploadSuccess}
+        onViewDocument={(doc) => {
+          handleOpenHandbook(1, {
+            documentId: doc.document_id || doc.documentId,
+            documentName: doc.file_name || doc.documentName,
+            isDefault:
+              Boolean(doc.is_default || doc.isDefault) ||
+              (doc.document_id || doc.documentId) === "00000000-0000-0000-0000-000000000002" ||
+              (doc.file_name || doc.documentName) === "WorkPilot_Company_Policy.pdf",
+          });
+        }}
       />
     </>
   );
