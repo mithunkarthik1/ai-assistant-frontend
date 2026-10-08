@@ -339,7 +339,7 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
       </div>
 
       {/* Message & Actions Container */}
-      <div className={`flex flex-col gap-0.5 max-w-[85%] ${isUser ? "items-end" : "items-start"}`}>
+      <div className={`flex flex-col gap-0.5 ${isUser ? "max-w-[85%] items-end" : "w-full max-w-[95%] sm:max-w-[90%] items-start"}`}>
         {/* Message Bubble */}
         <div
           className={`relative rounded-2xl px-4 py-2.5 text-sm leading-relaxed select-text shadow-xs ${
@@ -441,7 +441,7 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
                       highlightText: "",
                     })
                   }
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all cursor-pointer shadow-2xs hover:shadow-xs group/chip max-w-full ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all cursor-pointer shadow-2xs hover:shadow-xs group/chip max-w-full overflow-hidden ${
                     isViolet
                       ? "bg-violet-50/90 hover:bg-violet-100 text-violet-900 border-violet-200/90"
                       : "bg-indigo-50/90 hover:bg-indigo-100 text-indigo-900 border-indigo-200/90"
@@ -453,14 +453,14 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
                       isViolet ? "text-violet-600" : "text-indigo-600"
                     }`}
                   />
-                  <span className="font-semibold text-slate-800 shrink-0 truncate max-w-[120px] sm:max-w-[150px]">
+                  <span className="font-semibold text-slate-800 truncate min-w-0 max-w-[120px] sm:max-w-[160px]">
                     {doc.filename}
                   </span>
                   {doc.topic && (
                     <>
-                      <span className="text-slate-300 select-none">•</span>
+                      <span className="text-slate-300 select-none shrink-0">•</span>
                       <span
-                        className={`font-semibold px-1 py-0.5 rounded text-[10px] shrink-0 truncate max-w-[110px] sm:max-w-[140px] ${
+                        className={`font-semibold px-1 py-0.5 rounded text-[10px] truncate min-w-0 max-w-[110px] sm:max-w-[150px] ${
                           isViolet
                             ? "bg-violet-100/90 text-violet-700"
                             : "bg-indigo-100/90 text-indigo-700"
@@ -470,9 +470,9 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
                       </span>
                     </>
                   )}
-                  <span className="text-slate-300 select-none">•</span>
+                  <span className="text-slate-300 select-none shrink-0">•</span>
                   <span
-                    className={`text-[10px] font-bold shrink-0 ${
+                    className={`text-[10px] font-bold shrink-0 whitespace-nowrap ${
                       isViolet ? "text-violet-600" : "text-indigo-600"
                     }`}
                   >

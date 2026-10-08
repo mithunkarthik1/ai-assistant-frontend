@@ -333,11 +333,10 @@ export default function DocumentUploadModal({
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => !isUploading && fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-xl p-5 sm:p-6 text-center cursor-pointer transition-all ${
-              dragOver
+            className={`border-2 border-dashed rounded-xl p-5 sm:p-6 text-center cursor-pointer transition-all ${dragOver
                 ? "border-indigo-500 bg-indigo-50/50 scale-[1.005]"
                 : "border-slate-300 hover:border-indigo-400 hover:bg-slate-50/70"
-            } ${isUploading ? "pointer-events-none opacity-60" : ""}`}
+              } ${isUploading ? "pointer-events-none opacity-60" : ""}`}
           >
             <div className="w-10 h-10 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 mx-auto mb-2.5 shadow-2xs">
               {isUploading ? (
@@ -410,7 +409,7 @@ export default function DocumentUploadModal({
                   </span>
                 </div>
 
-                {/* Exact Text String Requested by User with Clean Semantic Colors */}
+                {/* Exact Text String Requested by User with Clean Semantic Colors
                 <div className="font-mono text-xs sm:text-sm font-semibold bg-slate-50 py-2 px-3 rounded-md border border-slate-200/80 text-slate-700 flex items-center justify-center flex-wrap gap-x-2.5 gap-y-1 text-center">
                   <span>Added: <strong className="text-emerald-600 font-bold">{uploadResult.chunks_added ?? 0}</strong></span>
                   <span className="text-slate-300 select-none">|</span>
@@ -419,7 +418,7 @@ export default function DocumentUploadModal({
                   <span>Skipped (0 cost): <strong className="text-amber-600 font-bold">{uploadResult.chunks_skipped ?? 0}</strong></span>
                   <span className="text-slate-300 select-none">|</span>
                   <span>Deleted: <strong className="text-rose-600 font-bold">{uploadResult.chunks_deleted ?? 0}</strong></span>
-                </div>
+                </div> */}
 
                 {/* Minimal Professional Stat Counters */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-center">
@@ -443,7 +442,7 @@ export default function DocumentUploadModal({
 
                 {uploadResult.chunks_skipped > 0 && !uploadResult.chunks_added && !uploadResult.chunks_updated && (
                   <div className="text-[11px] text-amber-800 bg-amber-50/80 border border-amber-200/70 px-2.5 py-1.5 rounded flex items-center gap-1.5">
-                    <span>Document matches existing version. All {uploadResult.chunks_skipped} sections are already indexed & ready (0 cost).</span>
+                    <span>Document matches existing version. All {uploadResult.chunks_skipped} sections are already indexed & ready.</span>
                   </div>
                 )}
               </div>
@@ -508,9 +507,8 @@ export default function DocumentUploadModal({
                   title="Refresh document registry"
                 >
                   <RefreshCw
-                    className={`w-3.5 h-3.5 transition-transform ${
-                      isRefreshing || isLoading ? "animate-spin text-indigo-600" : ""
-                    }`}
+                    className={`w-3.5 h-3.5 transition-transform ${isRefreshing || isLoading ? "animate-spin text-indigo-600" : ""
+                      }`}
                   />
                   <span className="hidden sm:inline">Refresh</span>
                 </button>

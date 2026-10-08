@@ -29,7 +29,8 @@ export async function getDocumentPages(documentId = null) {
 
 export function getPolicyPdfUrl() {
   const baseURL = api.defaults.baseURL || "http://localhost:8001/api/v1";
-  return `${baseURL}/chat/pdf`;
+  const token = localStorage.getItem("ai_assistant_auth_token");
+  return token ? `${baseURL}/chat/pdf?token=${encodeURIComponent(token)}` : `${baseURL}/chat/pdf`;
 }
 
 export async function uploadDocument(file, onProgress = null) {
