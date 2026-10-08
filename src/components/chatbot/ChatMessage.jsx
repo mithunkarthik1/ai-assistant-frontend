@@ -438,7 +438,7 @@ export default function ChatMessage({ message, previousMessage, onOpenHandbook, 
                       isDefault: doc.isDefault,
                       targetSection: doc.section,
                       targetTopic: doc.topic,
-                      highlightText: doc.topic || doc.section || "",
+                      highlightText: "",
                     })
                   }
                   className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all cursor-pointer shadow-2xs hover:shadow-xs group/chip max-w-full ${

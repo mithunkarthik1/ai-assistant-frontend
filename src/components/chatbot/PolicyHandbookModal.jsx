@@ -115,7 +115,7 @@ export default function PolicyHandbookModal({
         setLoading(false);
       }
     }
-    if (isOpen && (loadedDocIdRef.current !== documentId || pages.length === 0)) {
+    if (isOpen) {
       loadPages();
     }
   }, [isOpen, documentId]);
@@ -392,27 +392,16 @@ export default function PolicyHandbookModal({
     }
   };
 
-  // Helper to highlight matching text
+  // Helper to highlight matching text only when user explicitly searches in the reader search box
   const highlightTextContent = (text) => {
     if (!text) return "";
-    const activeQuery = (searchQuery.trim() || highlightText.trim()).trim();
-    if (!activeQuery) return text;
+    const activeQuery = searchQuery.trim();
+    if (!activeQuery) return text; // Clean, natural reading when browsing or jumping to pages
 
-    const words = activeQuery
-      .split(/\s+/)
-      .map((w) => w.trim())
-      .filter((w) => w.length > 2 && !["the", "and", "for", "with", "from", "policy", "doc", "document"].includes(w.toLowerCase()));
-
-    const termsToMatch = Array.from(new Set([activeQuery, ...words])).filter(Boolean);
-    const pattern = termsToMatch
-      .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-      .join("|");
-
-    if (!pattern) return text;
-
+    const pattern = activeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const parts = String(text).split(new RegExp(`(${pattern})`, "gi"));
     return parts.map((part, i) => {
-      const isMatch = termsToMatch.some((t) => t.toLowerCase() === part.toLowerCase());
+      const isMatch = part.toLowerCase() === activeQuery.toLowerCase();
       return isMatch ? (
         <mark key={i} className="bg-amber-200 text-amber-950 font-semibold px-0.5 rounded shadow-2xs">
           {part}
@@ -426,8 +415,14 @@ export default function PolicyHandbookModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl h-[92vh] max-h-[880px] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-5xl h-[92vh] max-h-[880px] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Top Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50/90">
           <div className="flex items-center gap-2.5">
@@ -436,9 +431,9 @@ export default function PolicyHandbookModal({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
-                {isDefault ? "WorkPilot Official Policy Handbook" : `${documentName} Handbook`}
+                {isDefault ? "WorkPilot Official Policy Handbook" : documentName}
                 <span className="hidden sm:inline-block text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full">
-                  {isDefault ? "Verified PDF • 5 Pages" : `Document Handbook • ${pages.length} Pages`}
+                  {isDefault ? "Verified PDF • 5 Pages" : `Document Handbook • ${pages.length} ${pages.length === 1 ? "Page" : "Pages"}`}
                 </span>
               </h2>
               <p className="text-xs text-slate-500 hidden sm:block">
@@ -725,21 +720,12 @@ export default function PolicyHandbookModal({
                               key={sec.num}
                               id={secId}
                               data-section-title={sec.title}
-                              className={`p-4 rounded-xl transition-all duration-500 ${
-                                isTarget
-                                  ? "bg-indigo-50/80 border-2 border-indigo-500 ring-4 ring-indigo-200/70 shadow-md"
-                                  : "bg-slate-50/50 border border-slate-100 hover:border-slate-200"
-                              }`}
+                              className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs"
                             >
                               <div className="flex items-start justify-between gap-3 mb-2">
                                 <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
                                   <span className="text-indigo-600 font-extrabold">§ {sec.num}.</span>
                                   <span>{highlightTextContent(sec.title)}</span>
-                                  {isTarget && (
-                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white shadow-xs animate-pulse">
-                                      🎯 Selected Topic
-                                    </span>
-                                  )}
                                 </h3>
 
                                 <div className="flex items-center gap-1 shrink-0">
@@ -767,7 +753,7 @@ export default function PolicyHandbookModal({
                               </div>
 
                               {sec.intro && (
-                                <p className="text-xs sm:text-sm text-slate-600 italic bg-white p-2.5 rounded-lg border border-slate-200/70 mb-3">
+                                <p className="text-xs sm:text-sm text-slate-600 italic bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/60 mb-3">
                                   {highlightTextContent(sec.intro)}
                                 </p>
                               )}
@@ -775,7 +761,6 @@ export default function PolicyHandbookModal({
                               <ul className="space-y-2">
                                 {sec.bullets.map((b, idx) => {
                                   const bulletId = `section-${sec.num}-bullet-${idx}`;
-                                  const isBulletTarget = focusedSectionId === bulletId;
                                   const hasColon = b.includes(":");
                                   if (hasColon) {
                                     const [label, val] = b.split(":", 1);
@@ -784,11 +769,7 @@ export default function PolicyHandbookModal({
                                       <li
                                         key={idx}
                                         id={bulletId}
-                                        className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1.5 transition-all duration-300 ${
-                                          isBulletTarget
-                                            ? "bg-indigo-100/90 border border-indigo-500 ring-4 ring-indigo-300/80 shadow-xs text-indigo-950 font-medium"
-                                            : "text-slate-700 hover:bg-slate-50/50"
-                                        }`}
+                                        className="text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 text-slate-700"
                                       >
                                         <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                           •
@@ -799,11 +780,6 @@ export default function PolicyHandbookModal({
                                           </strong>{" "}
                                           {highlightTextContent(rest.trim())}
                                         </div>
-                                        {isBulletTarget && (
-                                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white shrink-0 shadow-2xs animate-pulse">
-                                            🎯 Topic
-                                          </span>
-                                        )}
                                       </li>
                                     );
                                   }
@@ -811,21 +787,12 @@ export default function PolicyHandbookModal({
                                     <li
                                       key={idx}
                                       id={bulletId}
-                                      className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1.5 transition-all duration-300 ${
-                                        isBulletTarget
-                                          ? "bg-indigo-100/90 border border-indigo-500 ring-4 ring-indigo-300/80 shadow-xs text-indigo-950 font-medium"
-                                          : "text-slate-700 hover:bg-slate-50/50"
-                                      }`}
+                                      className="text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 text-slate-700"
                                     >
                                       <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                         •
                                       </span>
                                       <div className="flex-1">{highlightTextContent(b.trim())}</div>
-                                      {isBulletTarget && (
-                                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white shrink-0 shadow-2xs animate-pulse">
-                                          🎯 Topic
-                                        </span>
-                                      )}
                                     </li>
                                   );
                                 })}
@@ -866,63 +833,29 @@ export default function PolicyHandbookModal({
                             return blocks.map((block, bIdx) => {
                               const blockId = `block-${pageNum}-${bIdx}`;
                               if (block.type === "heading") {
-                                const headingClean = block.text.toLowerCase().replace(/[^a-z0-9]/g, "");
-                                const isTargetHeading =
-                                  focusedSectionId === blockId ||
-                                  (Boolean(queryClean) &&
-                                    (headingClean.includes(queryClean) ||
-                                      queryClean.includes(headingClean) ||
-                                      targetTokens.some((tok) => headingClean.includes(tok))));
-
                                 return (
                                   <h4
                                     key={bIdx}
                                     id={blockId}
-                                    data-target-heading={isTargetHeading ? "true" : undefined}
-                                    className={`font-bold text-xs sm:text-sm pt-2.5 pb-2 px-3 rounded-xl border flex items-center justify-between gap-2 transition-all duration-500 my-2 ${
-                                      isTargetHeading
-                                        ? "bg-violet-100/90 border-2 border-violet-500 text-violet-950 ring-4 ring-violet-200/80 shadow-md"
-                                        : "bg-transparent border-b border-slate-100 text-slate-900"
-                                    }`}
+                                    className="font-bold text-xs sm:text-sm pt-2.5 pb-1.5 text-slate-900 border-b border-slate-100 flex items-center gap-2 my-2"
                                   >
-                                    <div className="flex items-center gap-2">
-                                      <span className="w-1.5 h-3.5 bg-violet-600 rounded-full inline-block shrink-0" />
-                                      <span>{highlightTextContent(block.text)}</span>
-                                    </div>
-                                    {isTargetHeading && (
-                                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-600 text-white shadow-xs animate-pulse shrink-0">
-                                        🎯 Referenced Topic
-                                      </span>
-                                    )}
+                                    <span className="w-1.5 h-3.5 bg-indigo-600 rounded-full inline-block shrink-0" />
+                                    <span>{highlightTextContent(block.text)}</span>
                                   </h4>
                                 );
                               }
 
                               if (block.type === "bullet") {
-                                const isTargetBullet =
-                                  focusedSectionId === blockId ||
-                                  (targetTokens.length > 0 &&
-                                    targetTokens.some((tok) => block.text.toLowerCase().includes(tok)));
-
                                 return (
                                   <div
                                     key={bIdx}
                                     id={blockId}
-                                    className={`flex items-start gap-2 text-xs sm:text-sm leading-relaxed p-1.5 rounded-lg transition-all duration-300 ${
-                                      isTargetBullet
-                                        ? "bg-violet-50/90 border border-violet-200/90 ring-2 ring-violet-300/40 shadow-2xs text-slate-900"
-                                        : "text-slate-700 pl-1"
-                                    }`}
+                                    className="flex items-start gap-2 text-xs sm:text-sm leading-relaxed p-1 text-slate-700"
                                   >
-                                    <span className="text-violet-600 font-bold shrink-0 mt-0.5 select-none">•</span>
+                                    <span className="text-indigo-600 font-bold shrink-0 mt-0.5 select-none">•</span>
                                     <div className="flex-1 leading-relaxed">
                                       {highlightTextContent(block.text)}
                                     </div>
-                                    {isTargetBullet && (
-                                      <span className="text-[10px] font-bold text-violet-700 bg-violet-100/80 px-1.5 py-0.5 rounded shrink-0">
-                                        📍 Cited
-                                      </span>
-                                    )}
                                   </div>
                                 );
                               }
