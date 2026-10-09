@@ -1,1 +1,58 @@
 @import "tailwindcss";
+
+/* ==========================================================================
+   ENTERPRISE THEME & AUTOFILL RESETS
+   Solves browser default white/yellow background overrides on input fields
+   ========================================================================== */
+
+/* Dark Mode Autofill Styles */
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover, 
+.dark input:-webkit-autofill:focus, 
+.dark input:-webkit-autofill:active,
+[data-theme="dark"] input:-webkit-autofill,
+[data-theme="dark"] input:-webkit-autofill:hover,
+[data-theme="dark"] input:-webkit-autofill:focus,
+[data-theme="dark"] input:-webkit-autofill:active,
+input.auth-input-dark:-webkit-autofill,
+input.auth-input-dark:-webkit-autofill:hover,
+input.auth-input-dark:-webkit-autofill:focus,
+input.auth-input-dark:-webkit-autofill:active {
+  -webkit-text-fill-color: #f4f4f5 !important;
+  -webkit-box-shadow: 0 0 0px 1000px #09090b inset !important;
+  box-shadow: 0 0 0px 1000px #09090b inset !important;
+  caret-color: #f4f4f5 !important;
+  transition: background-color 50000s ease-in-out 0s;
+}
+
+/* Light Mode Autofill Styles */
+html:not(.dark) input:-webkit-autofill,
+html:not(.dark) input:-webkit-autofill:hover,
+html:not(.dark) input:-webkit-autofill:focus,
+html:not(.dark) input:-webkit-autofill:active,
+[data-theme="light"] input:-webkit-autofill,
+[data-theme="light"] input:-webkit-autofill:hover,
+[data-theme="light"] input:-webkit-autofill:focus,
+[data-theme="light"] input:-webkit-autofill:active,
+input.auth-input-light:-webkit-autofill,
+input.auth-input-light:-webkit-autofill:hover,
+input.auth-input-light:-webkit-autofill:focus,
+input.auth-input-light:-webkit-autofill:active {
+  -webkit-text-fill-color: #0f172a !important;
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  caret-color: #0f172a !important;
+  transition: background-color 50000s ease-in-out 0s;
+}
+
+/* Smooth global transitions across all theme toggles */
+body {
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.theme-transition {
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

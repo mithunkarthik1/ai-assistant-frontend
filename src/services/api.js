@@ -8,9 +8,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8001
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Request Interceptor: Attach JWT Bearer token to all outgoing requests
@@ -20,6 +17,16 @@ api.interceptors.request.use(
       const token = localStorage.getItem(STORAGE_TOKEN_KEY);
       if (token && !config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${token}`;
+      }
+      // If sending FormData (file uploads), remove Content-Type so browser sets multipart boundary
+      if (config.data instanceof FormData) {
+        if (config.headers && typeof config.headers.delete === "function") {
+          config.headers.delete("Content-Type");
+          config.headers.delete("content-type");
+        } else if (config.headers) {
+          delete config.headers["Content-Type"];
+          delete config.headers["content-type"];
+        }
       }
     } catch (err) {
       console.error("Auth header interceptor error:", err);
