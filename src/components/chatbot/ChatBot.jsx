@@ -7,10 +7,16 @@ import PolicyHandbookModal from "./PolicyHandbookModal";
 import DocumentUploadModal from "./DocumentUploadModal";
 import { sendMessage } from "../../services/chatService";
 
-export default function ChatBot() {
+export default function ChatBot({ isDark: propIsDark }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+
+  // Active dark mode state (from prop or documentElement class)
+  const activeIsDark =
+    propIsDark !== undefined
+      ? propIsDark
+      : typeof document !== "undefined" && document.documentElement.classList.contains("dark");
 
   // Handbook Viewer Modal State
   const [isHandbookOpen, setIsHandbookOpen] = useState(false);
@@ -60,12 +66,11 @@ export default function ChatBot() {
       });
       setHandbookHighlight("");
     }
+    setIsUploadModalOpen(false);
     setIsHandbookOpen(true);
   };
 
   const handleOpenUploadModal = () => {
-    setIsOpen(true);
-    setIsMinimized(false);
     setIsUploadModalOpen(true);
   };
 
@@ -91,9 +96,12 @@ export default function ChatBot() {
       const docInfo = e.detail?.docInfo || null;
       handleOpenHandbook(page, docInfo || highlight);
     };
-    const handleOpenChatEvent = () => {
+    const handleOpenChatEvent = (e) => {
       setIsOpen(true);
       setIsMinimized(false);
+      if (e?.detail?.message) {
+        handleSendMessage(e.detail.message);
+      }
     };
     const handleOpenUploadEvent = () => {
       handleOpenUploadModal();
@@ -176,16 +184,28 @@ export default function ChatBot() {
     }
   };
 
-  // Dynamic window classes based on state
+  // Dynamic window classes based on dashboard theme state
   const windowClasses = isMinimized
-    ? "fixed z-50 right-4 bottom-4 sm:right-6 sm:bottom-6 w-72 sm:w-84 h-14 rounded-2xl border border-slate-700/80 bg-slate-900 shadow-2xl overflow-hidden transition-all duration-300 ease-in-out hover:border-slate-600"
+    ? `fixed z-50 right-4 bottom-4 sm:right-6 sm:bottom-6 w-72 sm:w-84 h-14 rounded-2xl border shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
+        activeIsDark
+          ? "border-zinc-800 bg-zinc-900 text-white hover:border-zinc-700"
+          : "border-slate-200/90 bg-white text-slate-900 hover:border-slate-300"
+      }`
     : isMaximized
-    ? "fixed z-50 inset-2 sm:inset-6 md:inset-8 lg:inset-10 flex flex-col rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden transition-all duration-300 ease-in-out"
-    : "fixed z-50 inset-3 sm:inset-auto sm:right-6 sm:bottom-24 sm:w-[440px] sm:h-[640px] flex flex-col rounded-2xl border border-slate-200/90 bg-white shadow-2xl overflow-hidden transition-all duration-300 ease-in-out";
+    ? `fixed z-50 top-16 sm:top-20 bottom-3 sm:bottom-6 left-3 sm:left-6 right-3 sm:right-6 md:left-12 md:right-12 flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
+        activeIsDark
+          ? "border-zinc-800 bg-zinc-900 text-white"
+          : "border-slate-200/90 bg-white text-slate-900"
+      }`
+    : `fixed z-50 inset-3 sm:inset-auto sm:right-6 sm:bottom-24 sm:w-[440px] sm:h-[640px] flex flex-col rounded-2xl border shadow-2xl overflow-hidden transition-all duration-300 ease-in-out ${
+        activeIsDark
+          ? "border-zinc-800 bg-zinc-900 text-white"
+          : "border-slate-200/90 bg-white text-slate-900"
+      }`;
 
   return (
     <>
-      {/* Floating Chatbot Launcher Button */}
+      {/* Floating Chatbot Launcher Button: In Dark mode light icon, in Light mode old black icon */}
       {!isOpen && (
         <button
           onClick={() => {
@@ -193,7 +213,11 @@ export default function ChatBot() {
             setIsMinimized(false);
           }}
           aria-label="Open AI Assistant"
-          className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-xl hover:bg-slate-800 hover:scale-105 transition duration-200 cursor-pointer z-50 focus:outline-none focus:ring-4 focus:ring-slate-900/20"
+          className={`fixed bottom-6 right-6 w-14 h-14 rounded-full flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer z-50 focus:outline-none focus:ring-4 ${
+            activeIsDark
+              ? "bg-white text-zinc-950 hover:bg-zinc-100 shadow-xl shadow-white/5 border border-zinc-200 focus:ring-white/20"
+              : "bg-zinc-900 text-white hover:bg-zinc-800 shadow-xl shadow-zinc-900/30 focus:ring-zinc-900/20"
+          }`}
         >
           <MessageCircle className="w-7 h-7" />
         </button>
@@ -211,6 +235,7 @@ export default function ChatBot() {
             isMinimized={isMinimized}
             isMaximized={isMaximized}
             messageCount={messages.length}
+            isDark={activeIsDark}
           />
 
           {/* Body and Input (Hidden when minimized) */}
@@ -224,6 +249,7 @@ export default function ChatBot() {
                 onPromptClick={handleSendMessage}
                 onOpenHandbook={handleOpenHandbook}
                 isMaximized={isMaximized}
+                isDark={activeIsDark}
               />
 
               {/* Input Footer */}
@@ -232,6 +258,7 @@ export default function ChatBot() {
                 onOpenUploadModal={handleOpenUploadModal}
                 isSending={isSending}
                 isMaximized={isMaximized}
+                isDark={activeIsDark}
               />
             </>
           )}
@@ -249,6 +276,7 @@ export default function ChatBot() {
         documentId={handbookDocInfo.documentId}
         documentName={handbookDocInfo.documentName}
         isDefault={handbookDocInfo.isDefault}
+        isDark={activeIsDark}
       />
 
       {/* Incremental Document Upload & Knowledge Base Modal */}
@@ -256,6 +284,7 @@ export default function ChatBot() {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUploadSuccess={handleUploadSuccess}
+        isDark={activeIsDark}
         onViewDocument={(doc) => {
           handleOpenHandbook(1, {
             documentId: doc.document_id || doc.documentId,

@@ -9,6 +9,8 @@ import {
   BookOpen,
   ArrowUpRight,
   CheckCircle2,
+  ArrowLeft,
+  Image as ImageIcon,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { getDocumentPages, getPolicyPdfUrl } from "../../services/chatService";
@@ -25,11 +27,11 @@ function parseDocumentBlocks(rawText) {
 
   const blocks = [];
   let currentWords = [];
-  let currentType = "p"; // "p" | "heading" | "bullet"
+  let currentType = "p"; // "p" | "heading" | "bullet" | "image_ocr"
 
   const flush = () => {
     if (currentWords.length > 0) {
-      const combined = currentWords.join(" ").trim();
+      const combined = currentWords.join(currentType === "image_ocr" ? "\n" : " ").trim();
       if (combined) {
         blocks.push({ type: currentType, text: combined });
       }
@@ -40,6 +42,25 @@ function parseDocumentBlocks(rawText) {
 
   for (let i = 0; i < rawLines.length; i++) {
     let line = rawLines[i];
+
+    // Embedded Image / Diagram OCR blocks
+    if (line.includes("[Image / Diagram Content]") || line.startsWith("[Image Content]")) {
+      flush();
+      currentType = "image_ocr";
+      const cleanLine = line.replace(/\[Image\s*(?:\/\s*Diagram\s*)?Content\]:?/i, "").trim();
+      if (cleanLine) currentWords.push(cleanLine);
+      continue;
+    }
+
+    if (currentType === "image_ocr") {
+      const isHeadingLine = (line.endsWith(":") && line.split(" ").length <= 8) || /^(?:Section|Article|Chapter|Part|\d+\.)\s+/i.test(line);
+      if (isHeadingLine && !line.includes("[Image")) {
+        flush();
+      } else {
+        currentWords.push(line);
+        continue;
+      }
+    }
 
     // Standalone bullet markers
     if (["●", "○", "•", "■", "◆", "►"].includes(line)) {
@@ -82,6 +103,7 @@ export default function PolicyHandbookModal({
   documentId = "00000000-0000-0000-0000-000000000002",
   documentName = "WorkPilot_Company_Policy.pdf",
   isDefault = true,
+  isDark = false,
 }) {
   const [pages, setPages] = useState([]);
   const [docFileType, setDocFileType] = useState("");
@@ -463,31 +485,64 @@ export default function PolicyHandbookModal({
     if (onClose) onClose();
   };
 
+  // Close smoothly on Escape key press
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200"
+      style={{ zIndex: 80 }}
+      className={`fixed inset-0 flex items-start justify-center pt-16 sm:pt-20 pb-4 sm:pb-6 px-3 sm:px-6 backdrop-blur-md animate-in fade-in duration-200 overflow-hidden ${
+        isDark ? "bg-black/80" : "bg-slate-900/60"
+      }`}
       onClick={handleClose}
     >
       <div
-        className="relative w-full max-w-5xl h-[92vh] max-h-[880px] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+        className={`relative w-full max-w-5xl h-[calc(100vh-5rem)] sm:h-[calc(100vh-6.25rem)] max-h-[860px] flex flex-col rounded-2xl shadow-2xl border overflow-hidden ${
+          isDark
+            ? "bg-zinc-900 border-zinc-800 text-zinc-100 shadow-2xl"
+            : "bg-white border-slate-200 text-slate-800"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-slate-200 bg-slate-50/90">
+        <div
+          className={`flex items-center justify-between px-4 sm:px-6 py-3 border-b transition-colors duration-300 ${
+            isDark ? "border-zinc-800 bg-zinc-900 text-white" : "border-slate-200 bg-slate-50/90 text-slate-900"
+          }`}
+        >
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
               <BookOpen className="w-4 h-4" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-semibold text-slate-900 flex items-center gap-2">
+              <h2
+                className={`text-sm sm:text-base font-semibold flex items-center gap-2 ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
                 {isDefault ? "Company Policy Handbook" : documentName}
-                <span className="hidden sm:inline-block text-[11px] font-medium text-indigo-700 bg-indigo-50 border border-indigo-200/70 px-2 py-0.5 rounded-full">
+                <span
+                  className={`hidden sm:inline-block text-[11px] font-medium px-2 py-0.5 rounded-full border ${
+                    isDark
+                      ? "bg-indigo-950/50 text-indigo-300 border-indigo-800/60"
+                      : "bg-indigo-50 text-indigo-700 border-indigo-200/70"
+                  }`}
+                >
                   {isDefault ? "Verified PDF • 5 Pages" : `Document Handbook • ${pages.length} ${pages.length === 1 ? "Page" : "Pages"}`}
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 hidden sm:block">
+              <p className={`text-xs hidden sm:block ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
                 {isDefault
                   ? "Search, browse, or view the complete official PDF documentation"
                   : `Browse and search verified contents from ${documentName}`}
@@ -497,13 +552,35 @@ export default function PolicyHandbookModal({
 
           {/* Header Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {!isDefault && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleClose();
+                  window.dispatchEvent(new CustomEvent("open-document-upload"));
+                }}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border shadow-2xs cursor-pointer ${
+                  isDark
+                    ? "bg-zinc-800 text-zinc-200 hover:text-white hover:bg-zinc-700 border-zinc-700"
+                    : "bg-slate-100 text-slate-700 hover:text-slate-900 hover:bg-slate-200 border-slate-200"
+                }`}
+                title="Return to Document Knowledge Base"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Back to Documents</span>
+              </button>
+            )}
             {isDefault && (
               <>
                 <a
                   href={`${pdfUrl}#page=${selectedPage}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-900 border border-indigo-200/80 rounded-lg transition-colors shadow-2xs"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors border shadow-2xs ${
+                    isDark
+                      ? "bg-indigo-950/60 text-indigo-300 hover:text-white hover:bg-indigo-900 border-indigo-800/70"
+                      : "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-900 border-indigo-200/80"
+                  }`}
                   title="Open full PDF in new browser tab"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
@@ -512,7 +589,11 @@ export default function PolicyHandbookModal({
                 <a
                   href={pdfUrl}
                   download="WorkPilot_Company_Policy.pdf"
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 hover:bg-slate-200/70 rounded-lg transition-colors"
+                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    isDark
+                      ? "text-zinc-300 hover:text-white hover:bg-zinc-800"
+                      : "text-slate-700 hover:text-slate-900 hover:bg-slate-200/70"
+                  }`}
                   title="Download PDF file"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -522,7 +603,11 @@ export default function PolicyHandbookModal({
             )}
             <button
               onClick={handleClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer"
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                isDark
+                  ? "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                  : "text-slate-400 hover:text-slate-700 hover:bg-slate-200/70"
+              }`}
               aria-label="Close handbook modal"
             >
               <X className="w-5 h-5" />
@@ -531,16 +616,28 @@ export default function PolicyHandbookModal({
         </div>
 
         {/* Sub-bar: Search, Mode Switcher & Page Navigation */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 px-4 sm:px-6 py-2.5 border-b border-slate-100 bg-white">
+        <div
+          className={`flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5 px-4 sm:px-6 py-2.5 border-b transition-colors ${
+            isDark ? "border-zinc-800 bg-zinc-950" : "border-slate-100 bg-white"
+          }`}
+        >
           {/* Mode Switcher */}
           {isDefault ? (
-            <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium shrink-0 self-start md:self-auto">
+            <div
+              className={`inline-flex p-0.5 rounded-lg border text-xs font-medium shrink-0 self-start md:self-auto ${
+                isDark ? "bg-zinc-900 border-zinc-800" : "bg-slate-100 border-slate-200"
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => setActiveTab("reader")}
                 className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
                   activeTab === "reader"
-                    ? "bg-white text-indigo-700 shadow-xs font-semibold"
+                    ? isDark
+                      ? "bg-zinc-800 text-white shadow-xs font-semibold"
+                      : "bg-white text-indigo-700 shadow-xs font-semibold"
+                    : isDark
+                    ? "text-zinc-400 hover:text-zinc-200"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -551,7 +648,11 @@ export default function PolicyHandbookModal({
                 onClick={() => setActiveTab("raw_pdf")}
                 className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
                   activeTab === "raw_pdf"
-                    ? "bg-white text-indigo-700 shadow-xs font-semibold"
+                    ? isDark
+                      ? "bg-zinc-800 text-white shadow-xs font-semibold"
+                      : "bg-white text-indigo-700 shadow-xs font-semibold"
+                    : isDark
+                    ? "text-zinc-400 hover:text-zinc-200"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
@@ -559,8 +660,14 @@ export default function PolicyHandbookModal({
               </button>
             </div>
           ) : (
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-700 shrink-0 self-start md:self-auto">
-              <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+            <div
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-semibold shrink-0 self-start md:self-auto ${
+                isDark
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-200"
+                  : "bg-slate-100 border-slate-200 text-slate-700"
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
               <span>Interactive Reader</span>
             </div>
           )}
@@ -574,12 +681,16 @@ export default function PolicyHandbookModal({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={`Search in ${documentName}...`}
-                className="w-full pl-9 pr-8 py-1 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
+                className={`w-full pl-9 pr-8 py-1 text-xs sm:text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all ${
+                  isDark
+                    ? "bg-zinc-900 border-zinc-800 text-zinc-100 placeholder:text-zinc-500"
+                    : "bg-slate-50 border-slate-200 text-slate-800 placeholder:text-slate-400"
+                }`}
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5 rounded cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -589,7 +700,7 @@ export default function PolicyHandbookModal({
 
           {/* Quick Page Jump Pills */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-            <span className="text-xs text-slate-400 mr-1 font-medium hidden lg:inline">
+            <span className={`text-xs mr-1 font-medium hidden lg:inline ${isDark ? "text-zinc-400" : "text-slate-400"}`}>
               Pages:
             </span>
             {pages.map((p, idx) => {
@@ -602,7 +713,11 @@ export default function PolicyHandbookModal({
                   onClick={() => scrollToPage(pageNum)}
                   className={`px-2.5 py-1 text-xs font-medium rounded-md transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
                     isSelected
-                      ? "bg-indigo-600 text-white shadow-xs"
+                      ? isDark
+                        ? "bg-white text-zinc-950 font-bold shadow-xs"
+                        : "bg-indigo-600 text-white shadow-xs"
+                      : isDark
+                      ? "bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700"
                       : "bg-slate-100 hover:bg-slate-200 text-slate-700"
                   }`}
                 >
@@ -620,8 +735,16 @@ export default function PolicyHandbookModal({
 
         {/* Topics strip in reader mode */}
         {activeTab === "reader" && allTopics.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto px-4 sm:px-6 py-1.5 bg-slate-100/80 border-b border-slate-200 text-xs shrink-0">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
+          <div
+            className={`flex items-center gap-2 overflow-x-auto px-4 sm:px-6 py-1.5 border-b text-xs shrink-0 ${
+              isDark ? "bg-zinc-950 border-zinc-800" : "bg-slate-100/80 border-slate-200"
+            }`}
+          >
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wider shrink-0 flex items-center gap-1 ${
+                isDark ? "text-zinc-400" : "text-slate-500"
+              }`}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block" />
               Topics:
             </span>
@@ -636,7 +759,11 @@ export default function PolicyHandbookModal({
                     onClick={() => jumpToTopic(t)}
                     className={`px-2 py-0.5 rounded text-[11px] font-medium transition cursor-pointer shrink-0 border shadow-2xs ${
                       selectedPage === t.pageNum
-                        ? "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                        ? isDark
+                          ? "bg-zinc-800 text-indigo-300 border-indigo-700/80"
+                          : "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100"
+                        : isDark
+                        ? "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700 hover:text-white"
                         : "bg-white text-slate-600 border-slate-200 hover:text-slate-900 hover:border-slate-300"
                     }`}
                     title={`Jump to ${t.title} on Page ${t.pageNum}`}
@@ -648,9 +775,13 @@ export default function PolicyHandbookModal({
           </div>
         )}
 
-
         {/* Content View Area */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-slate-50/50">
+        <div
+          ref={scrollContainerRef}
+          className={`flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 ${
+            isDark ? "bg-zinc-950" : "bg-slate-50/50"
+          }`}
+        >
           {activeTab === "raw_pdf" && isDefault ? (
             <div className="w-full h-full min-h-[550px] bg-white rounded-xl overflow-hidden border border-slate-200 flex flex-col shadow-xs">
               <div className="px-4 py-2.5 bg-slate-100/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600 shrink-0">
@@ -750,19 +881,29 @@ export default function PolicyHandbookModal({
                   <div
                     key={pageNum}
                     ref={(el) => (pageRefs.current[pageNum] = el)}
-                    className={`bg-white rounded-xl border p-5 sm:p-7 shadow-xs transition-all duration-300 ${
+                    className={`rounded-xl border p-5 sm:p-7 shadow-xs transition-all duration-300 ${
+                      isDark
+                        ? "bg-zinc-900 border-zinc-800 text-zinc-100 shadow-xl"
+                        : "bg-white border-slate-200/90 text-slate-800"
+                    } ${
                       selectedPage === pageNum
-                        ? "ring-2 ring-indigo-500/40 border-indigo-300 shadow-md"
-                        : "border-slate-200/90"
+                        ? "ring-2 ring-indigo-500/40 border-indigo-400 shadow-md"
+                        : ""
                     }`}
                   >
                     {/* Page Card Header */}
-                    <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+                    <div className={`flex items-center justify-between pb-3 mb-4 border-b ${isDark ? "border-zinc-800" : "border-slate-100"}`}>
                       <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 rounded-md bg-indigo-50 text-indigo-700 text-xs font-bold flex items-center justify-center border border-indigo-200/60">
+                        <span
+                          className={`w-6 h-6 rounded-md text-xs font-bold flex items-center justify-center border ${
+                            isDark
+                              ? "bg-indigo-950/60 text-indigo-400 border-indigo-800/80"
+                              : "bg-indigo-50 text-indigo-700 border-indigo-200/60"
+                          }`}
+                        >
                           {pageNum}
                         </span>
-                        <span className="text-xs font-semibold text-slate-500 tracking-wider uppercase">
+                        <span className={`text-xs font-semibold tracking-wider uppercase ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
                           {documentName} • Page {pageNum} of {pages.length}
                         </span>
                       </div>
@@ -774,15 +915,23 @@ export default function PolicyHandbookModal({
                               setSelectedPage(pageNum);
                               setActiveTab("raw_pdf");
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 rounded-md transition-all cursor-pointer shadow-2xs"
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all cursor-pointer shadow-2xs border ${
+                              isDark
+                                ? "text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900 border-indigo-800/80"
+                                : "text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200/80"
+                            }`}
                             title={`Switch to Page ${pageNum} in PDF viewer`}
                           >
-                            <FileText className="w-3 h-3 text-indigo-600" />
+                            <FileText className="w-3 h-3 text-indigo-400" />
                             <span>View Page {pageNum} in PDF</span>
                           </button>
                         )}
                         {filteredMatches[pageNum] && (
-                          <span className="text-[11px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md border ${
+                            isDark
+                              ? "text-amber-300 bg-amber-950/60 border-amber-800/60"
+                              : "text-amber-800 bg-amber-50 border-amber-200"
+                          }`}>
                             {filteredMatches[pageNum]} match(es)
                           </span>
                         )}
@@ -801,11 +950,15 @@ export default function PolicyHandbookModal({
                               key={sec.num}
                               id={secId}
                               data-section-title={sec.title}
-                              className="p-4 rounded-xl bg-white border border-slate-200/90 shadow-2xs"
+                              className={`p-4 rounded-xl border shadow-2xs ${
+                                isDark
+                                  ? "bg-zinc-950/80 border-zinc-800/90 text-zinc-100"
+                                  : "bg-white border-slate-200/90 text-slate-900"
+                              }`}
                             >
                               <div className="flex items-start justify-between gap-3 mb-2">
-                                <h3 className="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
-                                  <span className="text-indigo-600 font-extrabold">§ {sec.num}.</span>
+                                <h3 className={`text-sm sm:text-base font-bold flex items-center gap-1.5 flex-wrap ${isDark ? "text-white" : "text-slate-900"}`}>
+                                  <span className="text-indigo-500 font-extrabold">§ {sec.num}.</span>
                                   <span>{highlightTextContent(sec.title)}</span>
                                 </h3>
 
@@ -816,7 +969,11 @@ export default function PolicyHandbookModal({
                                       setSelectedPage(pageNum);
                                       setActiveTab("raw_pdf");
                                     }}
-                                    className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-white transition cursor-pointer"
+                                    className={`p-1 rounded transition cursor-pointer ${
+                                      isDark
+                                        ? "text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800"
+                                        : "text-slate-400 hover:text-indigo-600 hover:bg-slate-100"
+                                    }`}
                                     title="View this topic in official PDF"
                                   >
                                     <FileText className="w-3.5 h-3.5" />
@@ -825,7 +982,11 @@ export default function PolicyHandbookModal({
                                     href={`${pdfUrl}#page=${pageNum}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-white transition"
+                                    className={`p-1 rounded transition ${
+                                      isDark
+                                        ? "text-zinc-400 hover:text-indigo-400 hover:bg-zinc-800"
+                                        : "text-slate-400 hover:text-indigo-600 hover:bg-slate-100"
+                                    }`}
                                     title="Open this topic's page in new browser tab"
                                   >
                                     <ExternalLink className="w-3.5 h-3.5" />
@@ -834,7 +995,11 @@ export default function PolicyHandbookModal({
                               </div>
 
                               {sec.intro && (
-                                <p className="text-xs sm:text-sm text-slate-600 italic bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/60 mb-3">
+                                <p className={`text-xs sm:text-sm italic p-2.5 rounded-lg border mb-3 ${
+                                  isDark
+                                    ? "bg-zinc-900/90 text-zinc-300 border-zinc-800"
+                                    : "bg-slate-50/80 text-slate-600 border-slate-200/60"
+                                }`}>
                                   {highlightTextContent(sec.intro)}
                                 </p>
                               )}
@@ -850,13 +1015,15 @@ export default function PolicyHandbookModal({
                                       <li
                                         key={idx}
                                         id={bulletId}
-                                        className="text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 text-slate-700"
+                                        className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 ${
+                                          isDark ? "text-zinc-200" : "text-slate-700"
+                                        }`}
                                       >
                                         <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                           •
                                         </span>
                                         <div className="flex-1">
-                                          <strong className="font-semibold text-slate-900">
+                                          <strong className={`font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
                                             {highlightTextContent(label.trim())}:
                                           </strong>{" "}
                                           {highlightTextContent(rest.trim())}
@@ -868,7 +1035,9 @@ export default function PolicyHandbookModal({
                                     <li
                                       key={idx}
                                       id={bulletId}
-                                      className="text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 text-slate-700"
+                                      className={`text-xs sm:text-sm leading-relaxed flex items-start gap-2 rounded-lg p-1 ${
+                                        isDark ? "text-zinc-200" : "text-slate-700"
+                                      }`}
                                     >
                                       <span className="text-indigo-500 font-bold mt-0.5 shrink-0">
                                         •
@@ -886,7 +1055,9 @@ export default function PolicyHandbookModal({
                       /* Format B: Uploaded document page rendered in structured format */
                       <div className="space-y-4">
                         {pageData.title && pageData.title !== `Page ${pageNum}` && (
-                          <div className="font-bold text-slate-900 text-sm sm:text-base border-b border-slate-100 pb-2 mb-2 flex items-center gap-2">
+                          <div className={`font-bold text-sm sm:text-base border-b pb-2 mb-2 flex items-center gap-2 ${
+                            isDark ? "text-white border-zinc-800" : "text-slate-900 border-slate-100"
+                          }`}>
                             <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
                             <span>{highlightTextContent(pageData.title)}</span>
                           </div>
@@ -899,7 +1070,7 @@ export default function PolicyHandbookModal({
 
                             if (!pageText.trim()) {
                               return (
-                                <p className="text-xs sm:text-sm text-slate-500 italic">
+                                <p className={`text-xs sm:text-sm italic ${isDark ? "text-zinc-500" : "text-slate-500"}`}>
                                   No textual content available on this page.
                                 </p>
                               );
@@ -928,14 +1099,16 @@ export default function PolicyHandbookModal({
 
                             if (isMarkdownDoc) {
                               return (
-                                <div className="text-slate-800 leading-relaxed space-y-3">
+                                <div className={`leading-relaxed space-y-3 ${isDark ? "text-zinc-200" : "text-slate-800"}`}>
                                   <ReactMarkdown
                                     components={{
                                       h1: ({ children }) => {
                                         const text = String(children);
                                         const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
                                         return (
-                                          <h2 id={`heading-${slug}`} className="text-base sm:text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 mt-4 mb-3 flex items-center gap-2">
+                                          <h2 id={`heading-${slug}`} className={`text-base sm:text-lg font-bold border-b pb-2 mt-4 mb-3 flex items-center gap-2 ${
+                                            isDark ? "text-white border-zinc-800" : "text-slate-900 border-slate-200"
+                                          }`}>
                                             <span className="w-1.5 h-4 bg-indigo-600 rounded-full inline-block shrink-0" />
                                             <span>{renderHighlighted(children)}</span>
                                           </h2>
@@ -945,7 +1118,9 @@ export default function PolicyHandbookModal({
                                         const text = String(children);
                                         const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
                                         return (
-                                          <h3 id={`heading-${slug}`} className="text-sm sm:text-base font-bold text-slate-900 border-b border-slate-100 pb-1.5 mt-4 mb-2 flex items-center gap-2">
+                                          <h3 id={`heading-${slug}`} className={`text-sm sm:text-base font-bold border-b pb-1.5 mt-4 mb-2 flex items-center gap-2 ${
+                                            isDark ? "text-white border-zinc-800" : "text-slate-900 border-slate-100"
+                                          }`}>
                                             <span className="w-1.5 h-3.5 bg-indigo-500 rounded-full inline-block shrink-0" />
                                             <span>{renderHighlighted(children)}</span>
                                           </h3>
@@ -955,7 +1130,9 @@ export default function PolicyHandbookModal({
                                         const text = String(children);
                                         const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-");
                                         return (
-                                          <h4 id={`heading-${slug}`} className="text-xs sm:text-sm font-semibold text-slate-800 mt-3 mb-1.5 flex items-center gap-1.5">
+                                          <h4 id={`heading-${slug}`} className={`text-xs sm:text-sm font-semibold mt-3 mb-1.5 flex items-center gap-1.5 ${
+                                            isDark ? "text-zinc-200" : "text-slate-800"
+                                          }`}>
                                             <span className="w-1 h-2.5 bg-indigo-400 rounded-full inline-block shrink-0" />
                                             <span>{renderHighlighted(children)}</span>
                                           </h4>
@@ -964,14 +1141,22 @@ export default function PolicyHandbookModal({
                                       code: ({ inline, children }) => {
                                         if (inline) {
                                           return (
-                                            <code className="px-1.5 py-0.5 rounded bg-slate-100 text-indigo-700 font-mono text-xs border border-slate-200">
+                                            <code className={`px-1.5 py-0.5 rounded font-mono text-xs border ${
+                                              isDark
+                                                ? "bg-zinc-950 text-indigo-300 border-zinc-800"
+                                                : "bg-slate-100 text-indigo-700 border-slate-200"
+                                            }`}>
                                               {children}
                                             </code>
                                           );
                                         }
                                         return (
-                                          <div className="my-3 rounded-lg overflow-hidden border border-slate-700 bg-slate-900 shadow-xs">
-                                            <div className="px-3 py-1 bg-slate-800 border-b border-slate-700 text-[11px] text-slate-400 font-mono flex items-center justify-between">
+                                          <div className={`my-3 rounded-lg overflow-hidden border shadow-xs ${
+                                            isDark ? "border-zinc-800 bg-zinc-950" : "border-slate-700 bg-slate-900"
+                                          }`}>
+                                            <div className={`px-3 py-1 border-b text-[11px] font-mono flex items-center justify-between ${
+                                              isDark ? "bg-zinc-900 border-zinc-800 text-zinc-400" : "bg-slate-800 border-slate-700 text-slate-400"
+                                            }`}>
                                               <span>Code / Structured Content</span>
                                             </div>
                                             <pre className="p-3.5 text-xs text-slate-100 font-mono overflow-x-auto leading-relaxed">
@@ -981,23 +1166,47 @@ export default function PolicyHandbookModal({
                                         );
                                       },
                                       table: ({ children }) => (
-                                        <div className="overflow-x-auto my-3 rounded-lg border border-slate-200 shadow-2xs bg-white">
-                                          <table className="w-full text-xs text-left text-slate-700 border-collapse">{children}</table>
+                                        <div className={`overflow-x-auto my-3 rounded-lg border shadow-2xs ${
+                                          isDark ? "border-zinc-800 bg-zinc-900" : "border-slate-200 bg-white"
+                                        }`}>
+                                          <table className={`w-full text-xs text-left border-collapse ${
+                                            isDark ? "text-zinc-200" : "text-slate-700"
+                                          }`}>{children}</table>
                                         </div>
                                       ),
-                                      thead: ({ children }) => <thead className="bg-slate-100 text-slate-900 font-semibold border-b border-slate-200">{children}</thead>,
-                                      th: ({ children }) => <th className="px-3 py-2 border-r border-slate-200 last:border-r-0 font-semibold">{children}</th>,
-                                      td: ({ children }) => <td className="px-3 py-2 border-b border-r border-slate-200 last:border-r-0 bg-white">{children}</td>,
-                                      ul: ({ children }) => <ul className="space-y-1.5 my-2 pl-4 list-disc marker:text-indigo-500 text-xs sm:text-sm text-slate-700">{children}</ul>,
-                                      ol: ({ children }) => <ol className="space-y-1.5 my-2 pl-4 list-decimal marker:text-indigo-600 font-medium text-xs sm:text-sm text-slate-700">{children}</ol>,
+                                      thead: ({ children }) => (
+                                        <thead className={`font-semibold border-b ${
+                                          isDark ? "bg-zinc-850 text-white border-zinc-700" : "bg-slate-100 text-slate-900 border-slate-200"
+                                        }`}>{children}</thead>
+                                      ),
+                                      th: ({ children }) => (
+                                        <th className={`px-3 py-2 border-r last:border-r-0 font-semibold ${
+                                          isDark ? "border-zinc-700" : "border-slate-200"
+                                        }`}>{children}</th>
+                                      ),
+                                      td: ({ children }) => (
+                                        <td className={`px-3 py-2 border-b border-r last:border-r-0 ${
+                                          isDark ? "border-zinc-800 bg-zinc-900 text-zinc-200" : "border-slate-200 bg-white text-slate-700"
+                                        }`}>{children}</td>
+                                      ),
+                                      ul: ({ children }) => <ul className={`space-y-1.5 my-2 pl-4 list-disc marker:text-indigo-500 text-xs sm:text-sm ${
+                                        isDark ? "text-zinc-200" : "text-slate-700"
+                                      }`}>{children}</ul>,
+                                      ol: ({ children }) => <ol className={`space-y-1.5 my-2 pl-4 list-decimal marker:text-indigo-600 font-medium text-xs sm:text-sm ${
+                                        isDark ? "text-zinc-200" : "text-slate-700"
+                                      }`}>{children}</ol>,
                                       li: ({ children }) => <li className="leading-relaxed">{renderHighlighted(children)}</li>,
-                                      p: ({ children }) => <p className="text-xs sm:text-sm text-slate-800 leading-relaxed my-2">{renderHighlighted(children)}</p>,
+                                      p: ({ children }) => <p className={`text-xs sm:text-sm leading-relaxed my-2 ${
+                                        isDark ? "text-zinc-200" : "text-slate-800"
+                                      }`}>{renderHighlighted(children)}</p>,
                                       blockquote: ({ children }) => (
-                                        <blockquote className="border-l-4 border-indigo-400 pl-3.5 py-1.5 my-2 bg-indigo-50/40 text-slate-700 text-xs sm:text-sm italic rounded-r">
+                                        <blockquote className={`border-l-4 border-indigo-400 pl-3.5 py-1.5 my-2 text-xs sm:text-sm italic rounded-r ${
+                                          isDark ? "bg-indigo-950/40 text-zinc-200" : "bg-indigo-50/40 text-slate-700"
+                                        }`}>
                                           {children}
                                         </blockquote>
                                       ),
-                                      hr: () => <hr className="my-4 border-slate-200" />,
+                                      hr: () => <hr className={`my-4 ${isDark ? "border-zinc-800" : "border-slate-200"}`} />,
                                     }}
                                   >
                                     {pageText}
@@ -1015,7 +1224,9 @@ export default function PolicyHandbookModal({
                                   <h4
                                     key={bIdx}
                                     id={blockId}
-                                    className="font-bold text-xs sm:text-sm pt-2.5 pb-1.5 text-slate-900 border-b border-slate-100 flex items-center gap-2 my-2"
+                                    className={`font-bold text-xs sm:text-sm pt-2.5 pb-1.5 border-b flex items-center gap-2 my-2 ${
+                                      isDark ? "text-white border-zinc-800" : "text-slate-900 border-slate-100"
+                                    }`}
                                   >
                                     <span className="w-1.5 h-3.5 bg-indigo-600 rounded-full inline-block shrink-0" />
                                     <span>{highlightTextContent(block.text)}</span>
@@ -1028,10 +1239,38 @@ export default function PolicyHandbookModal({
                                   <div
                                     key={bIdx}
                                     id={blockId}
-                                    className="flex items-start gap-2 text-xs sm:text-sm leading-relaxed p-1 text-slate-700"
+                                    className={`flex items-start gap-2 text-xs sm:text-sm leading-relaxed p-1 ${
+                                      isDark ? "text-zinc-200" : "text-slate-700"
+                                    }`}
                                   >
                                     <span className="text-indigo-600 font-bold shrink-0 mt-0.5 select-none">•</span>
                                     <div className="flex-1 leading-relaxed">
+                                      {highlightTextContent(block.text)}
+                                    </div>
+                                  </div>
+                                );
+                              }
+
+                              if (block.type === "image_ocr") {
+                                return (
+                                  <div
+                                    key={bIdx}
+                                    id={blockId}
+                                    className={`my-3 p-3.5 rounded-xl border shadow-2xs ${
+                                      isDark
+                                        ? "bg-zinc-950/90 border-indigo-900/50 text-zinc-200"
+                                        : "bg-indigo-50/40 border-indigo-100 text-slate-800"
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-indigo-200/40">
+                                      <div className={`p-1 rounded-md ${isDark ? "bg-indigo-950 text-indigo-400" : "bg-indigo-100 text-indigo-700"}`}>
+                                        <ImageIcon className="w-3.5 h-3.5" />
+                                      </div>
+                                      <span className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? "text-indigo-300" : "text-indigo-800"}`}>
+                                        Extracted from Embedded Image / Diagram (OCR)
+                                      </span>
+                                    </div>
+                                    <div className="text-xs sm:text-sm font-mono whitespace-pre-wrap leading-relaxed opacity-95">
                                       {highlightTextContent(block.text)}
                                     </div>
                                   </div>
@@ -1042,7 +1281,9 @@ export default function PolicyHandbookModal({
                                 <p
                                   key={bIdx}
                                   id={blockId}
-                                  className="text-xs sm:text-sm text-slate-800 leading-relaxed text-justify my-1"
+                                  className={`text-xs sm:text-sm leading-relaxed text-justify my-1 ${
+                                    isDark ? "text-zinc-200" : "text-slate-800"
+                                  }`}
                                 >
                                   {highlightTextContent(block.text)}
                                 </p>
@@ -1060,12 +1301,14 @@ export default function PolicyHandbookModal({
         </div>
 
         {/* Footer info bar */}
-        <div className="px-4 sm:px-6 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+        <div className={`px-4 sm:px-6 py-2.5 border-t flex items-center justify-between text-xs ${
+          isDark ? "bg-zinc-900 border-zinc-800 text-zinc-400" : "bg-slate-50 border-slate-200 text-slate-500"
+        }`}>
           <div className="flex items-center gap-1.5">
             <FileText className="w-3.5 h-3.5 text-slate-400" />
             <span>Document: {documentName}</span>
           </div>
-          <span className="hidden sm:inline text-slate-400">
+          <span className={`hidden sm:inline ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
             Click any section or page pill above to navigate instantly
           </span>
         </div>

@@ -30,20 +30,20 @@ function isDocumentQuery(text) {
   return docKeywords.some((kw) => lower.includes(kw)) || /\.(pdf|txt|docx|doc)\b/i.test(lower);
 }
 
-function ThinkingIndicator({ isDocumentBased = false }) {
+function ThinkingIndicator({ isDocumentBased = false, isDark = false }) {
   const [stageIndex, setStageIndex] = useState(0);
 
   const stages = isDocumentBased
     ? [
-        { text: "Thinking...", detail: "Analyzing your question", icon: Sparkles, color: "text-indigo-500" },
-        { text: "Searching knowledge base...", detail: "Checking documents", icon: Search, color: "text-blue-500" },
-        { text: "Consolidating...", detail: "Extracting relevant clauses", icon: Layers, color: "text-violet-500" },
-        { text: "Almost finished...", detail: "Synthesizing answer", icon: CheckCircle2, color: "text-emerald-500" },
+        { text: "Thinking...", detail: "Analyzing your question", icon: Sparkles, color: "text-indigo-400" },
+        { text: "Searching knowledge base...", detail: "Checking documents", icon: Search, color: "text-blue-400" },
+        { text: "Consolidating...", detail: "Extracting relevant clauses", icon: Layers, color: "text-violet-400" },
+        { text: "Almost finished...", detail: "Synthesizing answer", icon: CheckCircle2, color: "text-emerald-400" },
       ]
     : [
-        { text: "Thinking...", detail: "Analyzing your request", icon: Sparkles, color: "text-indigo-500" },
-        { text: "Loading...", detail: "Processing response", icon: Layers, color: "text-blue-500" },
-        { text: "Almost there...", detail: "Finalizing response", icon: CheckCircle2, color: "text-emerald-500" },
+        { text: "Thinking...", detail: "Analyzing your request", icon: Sparkles, color: "text-indigo-400" },
+        { text: "Loading...", detail: "Processing response", icon: Layers, color: "text-blue-400" },
+        { text: "Almost there...", detail: "Finalizing response", icon: CheckCircle2, color: "text-emerald-400" },
       ];
 
   useEffect(() => {
@@ -64,19 +64,43 @@ function ThinkingIndicator({ isDocumentBased = false }) {
 
   return (
     <div className="flex items-start gap-2.5 text-slate-500 text-xs pl-1 animate-in fade-in duration-300">
-      <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 shrink-0 mt-0.5">
-        <Bot className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+      <div
+        className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 shadow-xs transition-colors ${
+          isDark
+            ? "bg-zinc-800 text-indigo-400 border border-zinc-700/80"
+            : "bg-slate-200 text-slate-600"
+        }`}
+      >
+        <Bot className={`w-3.5 h-3.5 animate-pulse ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
       </div>
       <div className="flex flex-col gap-1 max-w-[320px]">
-        <div className="flex items-center gap-2.5 bg-white border border-slate-200/90 px-3.5 py-2.5 rounded-2xl rounded-tl-sm shadow-xs text-slate-700 transition-all duration-300">
-          <div className="w-5 h-5 rounded-md bg-slate-100 flex items-center justify-center shrink-0">
+        <div
+          className={`flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl rounded-tl-sm shadow-xs transition-all duration-300 border ${
+            isDark
+              ? "bg-zinc-900 border-zinc-800 text-zinc-200"
+              : "bg-white border-slate-200/90 text-slate-700"
+          }`}
+        >
+          <div
+            className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${
+              isDark ? "bg-zinc-950" : "bg-slate-100"
+            }`}
+          >
             <IconComponent className={`w-3.5 h-3.5 ${currentStage.color} animate-spin`} style={{ animationDuration: '3s' }} />
           </div>
           <div className="flex flex-col min-w-0">
-            <span className="font-semibold text-xs text-slate-800 transition-all duration-300 truncate">
+            <span
+              className={`font-semibold text-xs transition-all duration-300 truncate ${
+                isDark ? "text-white" : "text-slate-800"
+              }`}
+            >
               {currentStage.text}
             </span>
-            <span className="text-[10px] text-slate-400 font-normal truncate">
+            <span
+              className={`text-[10px] font-normal truncate ${
+                isDark ? "text-zinc-400" : "text-slate-400"
+              }`}
+            >
               {currentStage.detail}
             </span>
           </div>
@@ -91,7 +115,7 @@ function ThinkingIndicator({ isDocumentBased = false }) {
   );
 }
 
-export default function ChatMessages({ messages, isSending, error, onPromptClick, isMaximized, onOpenHandbook }) {
+export default function ChatMessages({ messages, isSending, error, onPromptClick, isMaximized, onOpenHandbook, isDark = false }) {
   const bottomRef = useRef(null);
 
   const [isPromptDismissed, setIsPromptDismissed] = useState(() => {
@@ -126,24 +150,46 @@ export default function ChatMessages({ messages, isSending, error, onPromptClick
   const userQueryCount = messages.filter((m) => m.role === "user").length;
 
   return (
-    <div className="flex-1 p-4 sm:p-6 overflow-y-auto bg-slate-50/70">
+    <div
+      className={`flex-1 p-4 sm:p-6 overflow-y-auto transition-colors duration-300 ${
+        isDark ? "bg-zinc-950 text-white" : "bg-slate-50/70 text-slate-900"
+      }`}
+    >
       <div className={`mx-auto w-full space-y-4 ${isMaximized ? "max-w-3xl" : "max-w-full"}`}>
         {/* Initial Welcome Greeting if no messages */}
         {messages.length === 0 && (
           <div className="flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs">
-              <Bot className="w-4 h-4 text-indigo-600" />
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center text-xs shrink-0 mt-0.5 shadow-xs transition-colors ${
+                isDark ? "bg-zinc-800 text-indigo-400 border border-zinc-700/80" : "bg-slate-200 text-slate-700"
+              }`}
+            >
+              <Bot className={`w-4 h-4 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
             </div>
-            <div className="rounded-2xl rounded-tl-sm px-4 py-3.5 bg-white border border-slate-200/80 text-slate-800 text-sm shadow-xs leading-relaxed max-w-[90%]">
-              <p className="font-semibold text-slate-900 mb-1 flex items-center gap-1.5">
+            <div
+              className={`rounded-2xl rounded-tl-sm px-4 py-3.5 text-sm shadow-xs leading-relaxed max-w-[90%] border transition-colors duration-300 ${
+                isDark
+                  ? "bg-zinc-900 border-zinc-800 text-zinc-100 shadow-sm"
+                  : "bg-white border-slate-200/80 text-slate-800"
+              }`}
+            >
+              <p
+                className={`font-semibold mb-1 flex items-center gap-1.5 ${
+                  isDark ? "text-white" : "text-slate-900"
+                }`}
+              >
                 <span>Welcome to AI Assistant</span>
                 <span className="text-base">👋</span>
               </p>
-              <p className="text-slate-600">
+              <p className={isDark ? "text-zinc-300" : "text-slate-600"}>
                 I can answer questions from your uploaded documents, company knowledge base, and projects.
               </p>
-              <div className="mt-3.5 pt-3 border-t border-slate-100">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              <div className={`mt-3.5 pt-3 border-t ${isDark ? "border-zinc-800" : "border-slate-100"}`}>
+                <p
+                  className={`text-[11px] font-semibold uppercase tracking-wider mb-2 ${
+                    isDark ? "text-zinc-400" : "text-slate-500"
+                  }`}
+                >
                   Frequently Asked Questions:
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -152,7 +198,11 @@ export default function ChatMessages({ messages, isSending, error, onPromptClick
                       key={idx}
                       type="button"
                       onClick={() => onPromptClick && onPromptClick(q)}
-                      className="text-left text-xs bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 px-2.5 py-1.5 rounded-lg border border-slate-200/60 transition cursor-pointer flex items-center gap-1.5 group"
+                      className={`text-left text-xs px-2.5 py-1.5 rounded-lg border transition cursor-pointer flex items-center gap-1.5 group ${
+                        isDark
+                          ? "bg-zinc-950 hover:bg-zinc-800 text-zinc-200 border-zinc-800 hover:border-zinc-700"
+                          : "bg-slate-100/80 hover:bg-slate-200/80 text-slate-700 border-slate-200/60"
+                      }`}
                     >
                       <span className="text-indigo-500 group-hover:translate-x-0.5 transition-transform">👉</span>
                       <span className="truncate">{q}</span>
@@ -172,6 +222,7 @@ export default function ChatMessages({ messages, isSending, error, onPromptClick
             previousMessage={index > 0 ? messages[index - 1] : null}
             onOpenHandbook={onOpenHandbook}
             onPromptClick={onPromptClick}
+            isDark={isDark}
           />
         ))}
 
@@ -179,6 +230,7 @@ export default function ChatMessages({ messages, isSending, error, onPromptClick
         {isSending && (
           <ThinkingIndicator
             isDocumentBased={isDocumentQuery([...messages].reverse().find((m) => m.role === "user")?.content)}
+            isDark={isDark}
           />
         )}
 
