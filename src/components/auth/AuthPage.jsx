@@ -14,6 +14,9 @@ import {
   FileText,
   Cpu,
   Layers,
+  Bot,
+  Database,
+  Scan,
   Check,
   X,
   Sun,
@@ -332,147 +335,188 @@ export default function AuthPage({ onAuthSuccess, currentTheme, onToggleTheme })
           }`}
         >
           <div>
-            {/* Top Security Status Pill */}
-            <div className="flex items-center justify-between mb-8">
+            {/* Top Status Pill matching Dashboard */}
+            <div className="flex items-center justify-between mb-6">
               <span
-                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shadow-xs ${
+                className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shadow-2xs border ${
                   isDark
-                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    ? "bg-zinc-800/80 text-zinc-300 border-zinc-700/80"
+                    : "bg-white text-slate-700 border-slate-200"
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Argon2id & JWT Verified
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Enterprise AI Platform</span>
+                <span className={`w-1 h-1 rounded-full ${isDark ? "bg-zinc-700" : "bg-slate-400"}`} />
+                <span className={`font-normal ${isDark ? "text-zinc-400" : "text-slate-500"}`}>Agents • RAG • OCR • Gen AI</span>
               </span>
 
-              <span className={`text-[11px] font-mono ${isDark ? "text-zinc-500" : "text-slate-500"}`}>
-                AES-256 GCM
-              </span>
             </div>
 
-            {/* Brand Header */}
-            <div className="flex items-center gap-3.5 mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-500/25 border border-indigo-400/30">
-                <Cpu className="w-6 h-6 text-white" />
+            {/* Brand Header matching Dashboard */}
+            <div className="flex items-center gap-3.5 mb-4">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-500/20 border border-indigo-400/30">
+                <Cpu className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1
-                  className={`text-2xl font-bold tracking-tight flex items-center gap-2 ${
-                    isDark ? "text-white" : "text-slate-900"
-                  }`}
-                >
-                  AI Assistant
-                </h1>
-                <p className={`text-xs font-medium ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
-                  Enterprise Knowledge Intelligence
+                <div className="flex items-center gap-2">
+                  <h1
+                    className={`text-2xl font-bold tracking-tight ${
+                      isDark ? "text-white" : "text-slate-900"
+                    }`}
+                  >
+                    AI Assistant
+                  </h1>
+                  <span
+                    className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md border ${
+                      isDark
+                        ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/20"
+                        : "bg-indigo-50 text-indigo-700 border-indigo-200"
+                    }`}
+                  >
+                    Enterprise
+                  </span>
+                </div>
+                <p className={`text-xs font-medium flex items-center gap-1.5 ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Enterprise AI Platform • Multi-Agent & RAG Core
                 </p>
               </div>
             </div>
 
-            {/* Value Proposition Statement */}
+            {/* Value Proposition Statement matching Dashboard */}
             <p
-              className={`text-sm font-normal leading-relaxed mt-4 ${
+              className={`text-xs sm:text-sm font-normal leading-relaxed ${
                 isDark ? "text-zinc-300" : "text-slate-600"
               }`}
             >
-              Authenticated workspace powered by multi-document vector search, optical diagram recognition, and centralized JWT security.
+              Unified enterprise AI platform powering intelligent agents, grounded knowledge retrieval, optical document vision, project workflows, and generative AI.
             </p>
 
-            {/* Feature Highlights */}
-            <div className="mt-7 space-y-3">
+            {/* Enterprise Capabilities Grid matching Dashboard */}
+            <div className="mt-5 space-y-2.5">
+              {/* 1. Autonomous Agents */}
               <div
-                className={`flex items-start gap-3 p-3.5 rounded-2xl border transition ${
+                className={`flex items-start gap-3 p-3 rounded-2xl border transition ${
                   isDark
                     ? "bg-zinc-950/60 border-zinc-800 hover:border-zinc-700"
-                    : "bg-white/80 border-slate-200/80 hover:border-indigo-200 hover:shadow-2xs"
+                    : "bg-white/90 border-slate-200/90 hover:border-indigo-200 hover:shadow-2xs"
                 }`}
               >
-                <FileText className={`w-5 h-5 mt-0.5 shrink-0 ${isDark ? "text-indigo-400" : "text-indigo-600"}`} />
+                <div className={`p-1.5 rounded-lg mt-0.5 shrink-0 ${isDark ? "bg-indigo-950/70 text-indigo-400" : "bg-indigo-50 text-indigo-600"}`}>
+                  <Bot className="w-4 h-4" />
+                </div>
                 <div>
-                  <h4 className={`text-xs font-semibold ${isDark ? "text-zinc-200" : "text-slate-800"}`}>
-                    Optical OCR & Diagram Scanner
+                  <h4 className={`text-xs font-bold ${isDark ? "text-zinc-200" : "text-slate-900"}`}>
+                    Autonomous Agents
                   </h4>
                   <p className={`text-[11px] mt-0.5 leading-relaxed ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
-                    Extracts embedded ER diagrams, workflow charts, and policy tables into vector memory.
+                    Goal-oriented multi-agent workflows, tool execution, and dynamic task automation.
                   </p>
                 </div>
               </div>
 
+              {/* 2. Enterprise RAG */}
               <div
-                className={`flex items-start gap-3 p-3.5 rounded-2xl border transition ${
+                className={`flex items-start gap-3 p-3 rounded-2xl border transition ${
                   isDark
                     ? "bg-zinc-950/60 border-zinc-800 hover:border-zinc-700"
-                    : "bg-white/80 border-slate-200/80 hover:border-indigo-200 hover:shadow-2xs"
+                    : "bg-white/90 border-slate-200/90 hover:border-indigo-200 hover:shadow-2xs"
                 }`}
               >
-                <Layers className={`w-5 h-5 mt-0.5 shrink-0 ${isDark ? "text-violet-400" : "text-violet-600"}`} />
+                <div className={`p-1.5 rounded-lg mt-0.5 shrink-0 ${isDark ? "bg-emerald-950/70 text-emerald-400" : "bg-emerald-50 text-emerald-600"}`}>
+                  <Database className="w-4 h-4" />
+                </div>
                 <div>
-                  <h4 className={`text-xs font-semibold ${isDark ? "text-zinc-200" : "text-slate-800"}`}>
-                    Grounded Multi-Document RAG
+                  <h4 className={`text-xs font-bold ${isDark ? "text-zinc-200" : "text-slate-900"}`}>
+                    Enterprise RAG
                   </h4>
                   <p className={`text-[11px] mt-0.5 leading-relaxed ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
-                    Verifiable answers backed by interactive PDF and DOCX passage highlighting.
+                    Hybrid dense and lexical vector retrieval grounded in official corporate knowledge.
                   </p>
                 </div>
               </div>
 
+              {/* 3. OCR Document Vision */}
               <div
-                className={`flex items-start gap-3 p-3.5 rounded-2xl border transition ${
+                className={`flex items-start gap-3 p-3 rounded-2xl border transition ${
                   isDark
                     ? "bg-zinc-950/60 border-zinc-800 hover:border-zinc-700"
-                    : "bg-white/80 border-slate-200/80 hover:border-indigo-200 hover:shadow-2xs"
+                    : "bg-white/90 border-slate-200/90 hover:border-indigo-200 hover:shadow-2xs"
                 }`}
               >
-                <ShieldCheck className={`w-5 h-5 mt-0.5 shrink-0 ${isDark ? "text-emerald-400" : "text-emerald-600"}`} />
+                <div className={`p-1.5 rounded-lg mt-0.5 shrink-0 ${isDark ? "bg-amber-950/70 text-amber-400" : "bg-amber-50 text-amber-600"}`}>
+                  <Scan className="w-4 h-4" />
+                </div>
                 <div>
-                  <h4 className={`text-xs font-semibold ${isDark ? "text-zinc-200" : "text-slate-800"}`}>
-                    Centralized JWT Auth Protection
+                  <h4 className={`text-xs font-bold ${isDark ? "text-zinc-200" : "text-slate-900"}`}>
+                    OCR Document Vision
                   </h4>
                   <p className={`text-[11px] mt-0.5 leading-relaxed ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
-                    Every query and document is authenticated with secure refresh tokens and session tracking.
+                    Optical transcription of embedded ER diagrams, screenshots, flowcharts, and tables.
+                  </p>
+                </div>
+              </div>
+
+              {/* 4. Projects & Gen AI */}
+              <div
+                className={`flex items-start gap-3 p-3 rounded-2xl border transition ${
+                  isDark
+                    ? "bg-zinc-950/60 border-zinc-800 hover:border-zinc-700"
+                    : "bg-white/90 border-slate-200/90 hover:border-indigo-200 hover:shadow-2xs"
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg mt-0.5 shrink-0 ${isDark ? "bg-violet-950/70 text-violet-400" : "bg-violet-50 text-violet-600"}`}>
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-xs font-bold ${isDark ? "text-zinc-200" : "text-slate-900"}`}>
+                    Projects & Gen AI
+                  </h4>
+                  <p className={`text-[11px] mt-0.5 leading-relaxed ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
+                    Project workspace integration, user-story intelligence, synthesis, and creative reasoning.
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom Trust Metrics Strip */}
-          <div className={`mt-8 pt-6 border-t ${isDark ? "border-zinc-800" : "border-slate-200/80"}`}>
-            <div className="grid grid-cols-3 gap-2.5 text-center">
+          {/* Bottom Trust Metrics Strip matching Dashboard & Security */}
+          <div className={`mt-6 pt-5 border-t ${isDark ? "border-zinc-800" : "border-slate-200/80"}`}>
+            <div className="grid grid-cols-3 gap-2 text-center">
               <div
-                className={`p-2.5 rounded-xl border ${
+                className={`p-2 rounded-xl border ${
                   isDark ? "bg-zinc-950/60 border-zinc-800" : "bg-white/90 border-slate-200/80 shadow-2xs"
                 }`}
               >
-                <p className={`text-sm sm:text-base font-extrabold ${isDark ? "text-white" : "text-slate-900"}`}>
-                  99.8%
+                <p className={`text-xs sm:text-sm font-extrabold ${isDark ? "text-white" : "text-slate-900"}`}>
+                  Autonomous
                 </p>
                 <p className={`text-[10px] font-medium ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
-                  Grounded
+                  Multi-Agent
                 </p>
               </div>
               <div
-                className={`p-2.5 rounded-xl border ${
+                className={`p-2 rounded-xl border ${
                   isDark ? "bg-zinc-950/60 border-zinc-800" : "bg-white/90 border-slate-200/80 shadow-2xs"
                 }`}
               >
-                <p className="text-sm sm:text-base font-extrabold text-indigo-600 dark:text-indigo-400">
-                  &lt; 350ms
+                <p className="text-xs sm:text-sm font-extrabold text-indigo-600 dark:text-indigo-400">
+                  Hybrid RAG
                 </p>
                 <p className={`text-[10px] font-medium ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
-                  RAG Speed
+                  Vector + Lexical
                 </p>
               </div>
               <div
-                className={`p-2.5 rounded-xl border ${
+                className={`p-2 rounded-xl border ${
                   isDark ? "bg-zinc-950/60 border-zinc-800" : "bg-white/90 border-slate-200/80 shadow-2xs"
                 }`}
               >
-                <p className="text-sm sm:text-base font-extrabold text-emerald-600 dark:text-emerald-400">
-                  100%
+                <p className="text-xs sm:text-sm font-extrabold text-emerald-600 dark:text-emerald-400">
+                  OCR Vision
                 </p>
                 <p className={`text-[10px] font-medium ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
-                  Secured
+                  Document AI
                 </p>
               </div>
             </div>
@@ -488,6 +532,18 @@ export default function AuthPage({ onAuthSuccess, currentTheme, onToggleTheme })
           }`}
         >
           <div className="max-w-md w-full mx-auto">
+            {/* Form Header matching Dashboard */}
+            <div className="mb-5 text-left">
+              <h2 className={`text-xl sm:text-2xl font-bold tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                {mode === "login" ? "Sign In to AI Assistant" : "Create Workspace Account"}
+              </h2>
+              <p className={`text-xs mt-1 leading-relaxed ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
+                {mode === "login"
+                  ? "Access your enterprise workspace, multi-agent workflows, and RAG intelligence."
+                  : "Join your organization's authenticated AI assistant platform."}
+              </p>
+            </div>
+
             {/* Mode Switcher Tabs */}
             <div
               className={`flex rounded-2xl p-1 mb-6 border transition-colors ${
@@ -704,7 +760,7 @@ export default function AuthPage({ onAuthSuccess, currentTheme, onToggleTheme })
                     </>
                   ) : (
                     <>
-                      <span>Sign In to Assistant</span>
+                      <span>Sign In to Platform</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -740,7 +796,7 @@ export default function AuthPage({ onAuthSuccess, currentTheme, onToggleTheme })
                       type="text"
                       autoComplete="name"
                       required
-                      placeholder="e.g. Mithun Karthik"
+                      placeholder="User Name"
                       value={signupName}
                       onChange={(e) => setSignupName(e.target.value)}
                       className={`w-full pl-10 pr-4 py-2 rounded-xl text-sm transition focus:outline-none ${
@@ -1057,7 +1113,7 @@ export default function AuthPage({ onAuthSuccess, currentTheme, onToggleTheme })
                     </>
                   ) : (
                     <>
-                      <span>Create Account & Sign In</span>
+                      <span>Create Account & Get Started</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
@@ -1065,11 +1121,11 @@ export default function AuthPage({ onAuthSuccess, currentTheme, onToggleTheme })
               </form>
             )}
 
-            {/* Bottom Security Assurance Note */}
+            {/* Bottom Security Assurance Note matching Dashboard */}
             <div className={`mt-8 pt-5 border-t text-center ${isDark ? "border-zinc-800" : "border-slate-200/80"}`}>
-              <p className={`text-[11px] font-medium flex items-center justify-center gap-1.5 ${isDark ? "text-zinc-500" : "text-slate-500"}`}>
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 dark:text-zinc-400" />
-                <span>Protected by Centralized JWT Authentication</span>
+              <p className={`text-[11px] font-medium flex items-center justify-center gap-1.5 ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>© 2026 AI Assistant Platform • Centralized JWT Security</span>
               </p>
             </div>
           </div>
